@@ -1,5 +1,3 @@
-/* The base64.c for the original license of the base64 code */
-
 #ifndef NGX_DLG_AUTH_TICKET_H
 #define NGX_DLG_AUTH_TICKET_H
 
@@ -26,12 +24,38 @@ typedef struct Ticket {
 	HawkcAlgorithm hawkAlgorithm;
 } *Ticket;
 
-typedef enum { OK, ERROR } Error;
+/*
+ *
+ */
+typedef enum {
+	OK,
+	ERROR_JSON_INVAL,
+	ERROR_JSON_NTOKENS,
+	ERROR_JSON_PART,
+	ERROR_MISSING_EXPECTED_TOKEN,
+	ERROR_UNEXPECTED_TOKEN_TYPE,
+	ERROR_UNEXPECTED_TOKEN_NAME,
+	ERROR_PARSE_TIME_VALUE,
+	ERROR_NSCOPES,
+	ERROR_UNKNOWN_HAWK_ALGORITHM,
+	ERROR
+} TicketError;
 
-Error ticket_from_string(Ticket ticket,char *b,unsigned int len,ngx_http_request_t *r);
+char* ticket_strerror(TicketError e);
 
+/*
+ * Parse a ticket from a json string. Allocation of the ticket is the
+ * responsibility of the caller. Usually, you should declare a local struct Ticket and
+ * pass a pointer to that.
+ */
+TicketError ticket_from_string(Ticket ticket,char *b,unsigned int len,ngx_http_request_t *r);
 
-
+/*
+ * Returns 1 if the ticket contains a scope that matches the scope implied
+ * by the provided host and realm.
+ * A scope name has the form host '|' realm
+ */
+int ticket_has_scope(Ticket ticket, HawkcString host, HawkcString realm);
 
 #ifdef __cplusplus
 } // extern "C"

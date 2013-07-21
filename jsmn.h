@@ -20,6 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 Dowloaded 18.7.2013 from https://bitbucket.org/zserge/jsmn
+Modified to work with non-\0-terminated strings.
 */
 #ifndef __JSMN_H_
 #define __JSMN_H_
@@ -82,7 +83,8 @@ void jsmn_init(jsmn_parser *parser);
 
 /**
  * Run JSON parser. It parses a JSON data string into and array of tokens, each describing
- * a single JSON object.
+ * a single JSON object. js need not be \0 terminated, instead len must contain the
+ * string length.
  */
 jsmnerr_t jsmn_parse(jsmn_parser *parser, const char *js, unsigned int len,
                 jsmntok_t *tokens, unsigned int num_tokens);

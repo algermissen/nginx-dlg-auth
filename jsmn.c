@@ -20,6 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 Dowloaded 18.7.2013 from https://bitbucket.org/zserge/jsmn
+Modified to work with non-\0-terminated strings.
 */
 #include <stdlib.h>
 
@@ -153,13 +154,16 @@ static jsmnerr_t jsmn_parse_string(jsmn_parser *parser, const char *js,
 
 /**
  * Parse JSON string and fill tokens.
+ * js need not be \0 terminated. Instead, len must contain the length of the string.
  */
 jsmnerr_t jsmn_parse(jsmn_parser *parser, const char *js, unsigned int len, jsmntok_t *tokens,
 		unsigned int num_tokens) {
 	jsmnerr_t r;
 	int i;
 	jsmntok_t *token;
-/*
+
+	/* This was the original loop, terminating on \0.
+	 * I changed this to work with a length parameter instead
 	for (; js[parser->pos] != '\0'; parser->pos++) {
 	*/
 	for (; parser->pos < len; parser->pos++) {
