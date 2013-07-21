@@ -7,10 +7,6 @@
 #include <ciron.h>
 #include "ticket.h"
 
-/* FIXME - a note: use this line to configure NGINX
- * ./configure --add-module=/Users/jan/Projects/NORD/ono/workspace/nginx-dlg-auth
- */
-
 /*
  * ciron user-provided buffer sizes. The size has been determined by using
  * some usual tickets, observing the required sizes and then adding a fair amount of
@@ -259,8 +255,8 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_str_t iron
     struct CironContext ciron_ctx;
 	CironError ce;
 	/* FIXME: rename in ciron - and the algos, too */
-	Options encryption_options = DEFAULT_ENCRYPTION_OPTIONS;
-    Options integrity_options = DEFAULT_INTEGRITY_OPTIONS;
+	CironOptions encryption_options = CIRON_DEFAULT_ENCRYPTION_OPTIONS;
+    CironOptions integrity_options = CIRON_DEFAULT_INTEGRITY_OPTIONS;
 	unsigned char encryption_buffer[ENCRYPTION_BUFFER_SIZE];
 	unsigned char output_buffer[OUTPUT_BUFFER_SIZE];
 	int check_len;
@@ -321,13 +317,13 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_str_t iron
 	 * received an invalid ticket anyway.
 	 */
 
-	if( (check_len = calculate_encryption_buffer_length(encryption_options, hawkc_ctx.header_in.id.len)) > sizeof(encryption_buffer)) {
+	if( (check_len = ciron_calculate_encryption_buffer_length(encryption_options, hawkc_ctx.header_in.id.len)) > sizeof(encryption_buffer)) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Required encryption buffer length %d too big. This might indicate an attack",
 				check_len);
 		return NGX_HTTP_BAD_REQUEST;
 	}
 
-	if( (check_len = calculate_unseal_buffer_length(encryption_options, integrity_options,hawkc_ctx.header_in.id.len)) > sizeof(output_buffer)) {
+	if( (check_len = ciron_calculate_unseal_buffer_length(encryption_options, integrity_options,hawkc_ctx.header_in.id.len)) > sizeof(output_buffer)) {
 			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Required output buffer length %d too big. This might indicate an attack",
 					check_len);
 			return NGX_HTTP_BAD_REQUEST;
