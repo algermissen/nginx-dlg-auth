@@ -269,7 +269,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_str_t iron
 	/*
 	 * Ticket processing and authorization checking.
 	 */
-
+	TicketError te;
 	struct Ticket ticket;
 	time_t now;
 
@@ -342,8 +342,8 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_str_t iron
 			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to unseal ticket: %s" , ciron_get_error(&ciron_ctx));
 			return NGX_HTTP_BAD_REQUEST;
 	}
-	if(ticket_from_string(&ticket , output_buffer,output_len) != OK) {
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to parse ticket JSON");
+	if( (te = ticket_from_string(&ticket , output_buffer,output_len)) != OK) {
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to parse ticket JSON, %s" , ticket_strerror(te));
 		return NGX_HTTP_BAD_REQUEST;
 	}
 
