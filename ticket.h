@@ -54,7 +54,7 @@ TicketError ticket_from_string(Ticket ticket,char *b,unsigned int len);
  * by the provided host and realm.
  * A scope name has the form host '|' realm
  */
-int ticket_has_scope(Ticket ticket, HawkcString host, HawkcString realm);
+int ticket_has_scope(Ticket ticket, unsigned char *host, unsigned int host_len, unsigned char *realm, unsigned int realm_len);
 
 #ifdef __cplusplus
 } // extern "C"

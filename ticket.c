@@ -243,15 +243,15 @@ TicketError do_algo(Builder builder) {
 	return OK;
 }
 
-int ticket_has_scope(Ticket ticket, HawkcString host, HawkcString realm) {
+int ticket_has_scope(Ticket ticket, unsigned char *host, unsigned int host_len, unsigned char *realm, unsigned int realm_len) {
 	int i;
-	int scope_len = host.len + 1 + realm.len; /* scope='host|realm' */
+	int scope_len = host_len + 1 + realm_len; /* scope='host|realm' */
 	for(i=0;i<ticket->nscopes;i++) {
 		if(ticket->scopes[i].len == scope_len) {
 			char *s = ticket->scopes[i].data;
-			if( (strncmp(s,host.data,host.len) == 0)
-					&& (s[host.len] == '|')
-					&& (strncmp(s+host.len+1,realm.data,realm.len) == 0)) {
+			if( (memcmp(s,host,host_len) == 0)
+					&& (s[host_len] == '|')
+					&& (memcmp(s+host_len+1,realm,realm_len) == 0)) {
 				return 1;
 			}
 		}
