@@ -3,7 +3,6 @@
 
 #include <hawkc.h>
 #include <time.h>
-#include <ngx_http.h>
 
 
 #ifdef __cplusplus
@@ -48,7 +47,7 @@ char* ticket_strerror(TicketError e);
  * responsibility of the caller. Usually, you should declare a local struct Ticket and
  * pass a pointer to that.
  */
-TicketError ticket_from_string(Ticket ticket,char *b,unsigned int len,ngx_http_request_t *r);
+TicketError ticket_from_string(Ticket ticket,char *b,unsigned int len);
 
 /*
  * Returns 1 if the ticket contains a scope that matches the scope implied

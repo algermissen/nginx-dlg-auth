@@ -3,10 +3,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <assert.h>
+#include <ctype.h>
 #include "ticket.h"
 #include "jsmn.h"
 
-#include <ngx_log.h>
 
 /*
  * This max number of tokens must be large enough to handle usual tickets.
@@ -81,6 +82,9 @@ TicketError ticket_from_string(Ticket ticket,char *json_string,unsigned int len)
 			return ERROR_JSON_NTOKENS;
 		case JSMN_ERROR_PART:
 			return ERROR_JSON_PART;
+		default:
+			/* Should never be reached */
+			return OK;
 		}
 		/* Should never be reached */
 		return ERROR;
