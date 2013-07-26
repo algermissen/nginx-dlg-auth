@@ -32,7 +32,7 @@ Modified to work with non-\0-terminated strings.
 static jsmntok_t *jsmn_alloc_token(jsmn_parser *parser, 
 		jsmntok_t *tokens, size_t num_tokens) {
 	jsmntok_t *tok;
-	if (parser->toknext >= num_tokens) {
+	if (parser->toknext >= (int)num_tokens) {
 		return NULL;
 	}
 	tok = &tokens[parser->toknext++];
