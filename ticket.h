@@ -18,7 +18,7 @@ typedef struct Ticket {
 	HawkcString pwd;
 	int rw;
 	HawkcString scopes[MAX_SCOPES];
-	int nscopes;
+	unsigned int nscopes;
 	time_t exp;
 	HawkcAlgorithm hawkAlgorithm;
 } *Ticket;

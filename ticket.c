@@ -38,6 +38,23 @@ static TicketError do_rw(Builder builder, int *v);
 static TicketError do_time(Builder builder, time_t *tp);
 static TicketError do_scopes(Builder builder);
 
+static int my_digittoint(char ch) {
+  int d = ch - '0';
+  if ((unsigned) d < 10) {
+    return d;
+  }
+  d = ch - 'a';
+  if ((unsigned) d < 6) {
+    return d + 10;
+  }
+  d = ch - 'A';
+  if ((unsigned) d < 6) {
+    return d + 10;
+  }
+  return -1;
+}
+
+
 
 /** Error strings used by ticket_strerror
  *
@@ -58,7 +75,7 @@ static char *error_strings[] = {
 };
 
 char* ticket_strerror(TicketError e) {
-	assert(e >= OK && e <= ERROR);
+	/* assert(e >= OK && e <= ERROR); */
 	return error_strings[e];
 }
 TicketError ticket_from_string(Ticket ticket,char *json_string,unsigned int len) {
@@ -185,7 +202,7 @@ TicketError do_time(Builder builder, time_t *tp) {
 		if(!isdigit(*p)) {
 			return ERROR_PARSE_TIME_VALUE;
 		}
-		x = (x * 10) + digittoint(*p);
+		x = (x * 10) + my_digittoint(*p);
 		p++;
 		i++;
 	}
@@ -244,8 +261,8 @@ TicketError do_algo(Builder builder) {
 }
 
 int ticket_has_scope(Ticket ticket, unsigned char *host, unsigned int host_len, unsigned char *realm, unsigned int realm_len) {
-	int i;
-	int scope_len = host_len + 1 + realm_len; /* scope='host|realm' */
+	unsigned int i;
+	unsigned int scope_len = host_len + 1 + realm_len; /* scope='host|realm' */
 	for(i=0;i<ticket->nscopes;i++) {
 		if(ticket->scopes[i].len == scope_len) {
 			char *s = ticket->scopes[i].data;
