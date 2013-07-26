@@ -291,15 +291,15 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_str_t iron
 	 */
 
 	hawkc_context_init(&hawkc_ctx);
-	hawkc_context_set_method(&hawkc_ctx,r->method_name.data, r->method_name.len);
-	hawkc_context_set_path(&hawkc_ctx,r->unparsed_uri.data, r->unparsed_uri.len);
-	hawkc_context_set_host(&hawkc_ctx,host.data,host.len);
-	hawkc_context_set_port(&hawkc_ctx,port.data,port.len);
+	hawkc_context_set_method(&hawkc_ctx,(char*)r->method_name.data, r->method_name.len);
+	hawkc_context_set_path(&hawkc_ctx,(char*)r->unparsed_uri.data, r->unparsed_uri.len);
+	hawkc_context_set_host(&hawkc_ctx,(char*)host.data,host.len);
+	hawkc_context_set_port(&hawkc_ctx,(char*)port.data,port.len);
 
 	/*
 	 * Parse Hawk Authorization header.
 	 */
-	if( (he = hawkc_parse_authorization_header(&hawkc_ctx,r->headers_in.authorization->value.data, r->headers_in.authorization->value.len)) != HAWKC_OK) {
+	if( (he = hawkc_parse_authorization_header(&hawkc_ctx,(char*)r->headers_in.authorization->value.data, r->headers_in.authorization->value.len)) != HAWKC_OK) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to parse Authorization header: %s" , hawkc_get_error(&hawkc_ctx));
 		if(he == HAWKC_BAD_SCHEME_ERROR) {
 			return ngx_dlg_auth_send_simple_401(r,&realm);
@@ -317,13 +317,13 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_str_t iron
 	 * received an invalid ticket anyway.
 	 */
 
-	if( (check_len = ciron_calculate_encryption_buffer_length(encryption_options, hawkc_ctx.header_in.id.len)) > sizeof(encryption_buffer)) {
+	if( (check_len = (int)ciron_calculate_encryption_buffer_length(encryption_options, hawkc_ctx.header_in.id.len)) > sizeof(encryption_buffer)) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Required encryption buffer length %d too big. This might indicate an attack",
 				check_len);
 		return NGX_HTTP_BAD_REQUEST;
 	}
 
-	if( (check_len = ciron_calculate_unseal_buffer_length(encryption_options, integrity_options,hawkc_ctx.header_in.id.len)) > sizeof(output_buffer)) {
+	if( (check_len = (int)ciron_calculate_unseal_buffer_length(encryption_options, integrity_options,hawkc_ctx.header_in.id.len)) > sizeof(output_buffer)) {
 			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Required output buffer length %d too big. This might indicate an attack",
 					check_len);
 			return NGX_HTTP_BAD_REQUEST;
@@ -338,7 +338,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_str_t iron
 			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to unseal ticket: %s" , ciron_get_error(&ciron_ctx));
 			return NGX_HTTP_BAD_REQUEST;
 	}
-	if( (te = ticket_from_string(&ticket , output_buffer,output_len)) != OK) {
+	if( (te = ticket_from_string(&ticket , (char*)output_buffer,output_len)) != OK) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to parse ticket JSON, %s" , ticket_strerror(te));
 		return NGX_HTTP_BAD_REQUEST;
 	}
@@ -347,7 +347,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_str_t iron
 	 * Validate the HMAC signature of the request.
 	 */
 
-	if( (he = hawkc_validate_hmac(&hawkc_ctx, ticket.hawkAlgorithm, ticket.pwd.data, ticket.pwd.len,&hmac_is_valid)) != HAWKC_OK) {
+	if( (he = hawkc_validate_hmac(&hawkc_ctx, ticket.hawkAlgorithm, (unsigned char*)ticket.pwd.data, ticket.pwd.len,&hmac_is_valid)) != HAWKC_OK) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to validate request signature: %s" , hawkc_get_error(&hawkc_ctx));
 		return NGX_HTTP_INTERNAL_SERVER_ERROR;
 	}
@@ -426,7 +426,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_str_t iron
 static void ngx_dlg_auth_rename_authorization_header(ngx_http_request_t *r) {
 	ngx_uint_t nelts;
 	size_t size;
-	int i;
+	unsigned int i;
 
 	/*
 	 * Headers come as a list which we have to iterate over to find
@@ -441,7 +441,7 @@ static void ngx_dlg_auth_rename_authorization_header(ngx_http_request_t *r) {
   	for(i=0; i < nelts; i++) {
    		void *elt;
    		ngx_table_elt_t *data;
-   		elt = r->headers_in.headers.part.elts + (i * size);
+   		elt = ((char*)r->headers_in.headers.part.elts) + (i * size); /* FIXME warning void* in arithm. */
    		data = (ngx_table_elt_t*)elt;
 
    		if(data->key.len == 13 && memcmp(data->lowcase_key,"authorization",13) == 0) {
@@ -461,7 +461,7 @@ static void ngx_dlg_auth_rename_authorization_header(ngx_http_request_t *r) {
  */
 static ngx_int_t ngx_dlg_auth_send_simple_401(ngx_http_request_t *r, ngx_str_t *realm) {
     	ngx_str_t challenge;
-    	char *p;
+    	unsigned char *p;
     	/*
     	 * Add new header.
     	 */
@@ -477,9 +477,9 @@ static ngx_int_t ngx_dlg_auth_send_simple_401(ngx_http_request_t *r, ngx_str_t *
           return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
-        p = ngx_cpymem(challenge.data, "Hawk realm=\"",12);
+        p = ngx_cpymem(challenge.data, (unsigned char*)"Hawk realm=\"",12);
         p = ngx_cpymem(p, realm->data, realm->len);
-        p = ngx_cpymem(p, "\"", 1);
+        p = ngx_cpymem(p, (unsigned char*)"\"", 1);
 
         r->headers_out.www_authenticate->value = challenge;
 
@@ -497,7 +497,7 @@ static ngx_int_t ngx_dlg_auth_send_simple_401(ngx_http_request_t *r, ngx_str_t *
  */
 static void get_host_and_port(ngx_str_t host_header, ngx_str_t *host, ngx_str_t *port) {
 		u_char *p;
-		int i;
+		unsigned int i;
 		port->len = 0;
 		p = host_header.data;
 		/* Extract host */
