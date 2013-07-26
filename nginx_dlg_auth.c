@@ -317,13 +317,13 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_str_t iron
 	 * received an invalid ticket anyway.
 	 */
 
-	if( (check_len = (int)ciron_calculate_encryption_buffer_length(encryption_options, hawkc_ctx.header_in.id.len)) > sizeof(encryption_buffer)) {
+	if( (check_len = (int)ciron_calculate_encryption_buffer_length(encryption_options, hawkc_ctx.header_in.id.len)) > (int)sizeof(encryption_buffer)) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Required encryption buffer length %d too big. This might indicate an attack",
 				check_len);
 		return NGX_HTTP_BAD_REQUEST;
 	}
 
-	if( (check_len = (int)ciron_calculate_unseal_buffer_length(encryption_options, integrity_options,hawkc_ctx.header_in.id.len)) > sizeof(output_buffer)) {
+	if( (check_len = (int)ciron_calculate_unseal_buffer_length(encryption_options, integrity_options,hawkc_ctx.header_in.id.len)) > (int)sizeof(output_buffer)) {
 			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Required output buffer length %d too big. This might indicate an attack",
 					check_len);
 			return NGX_HTTP_BAD_REQUEST;
