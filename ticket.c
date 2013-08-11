@@ -22,12 +22,15 @@
 #define MAX_TOKENS 27
 
 
+/*
+ * Structure to hold state while parsing.
+ */
 typedef struct Builder {
 	jsmn_parser parser;
 	jsmntok_t tokens[MAX_TOKENS];
-	int i;
+	size_t i;
 	Ticket ticket;
-	int ntokens;
+	size_t ntokens;
 	char *input;
 } *Builder;
 
@@ -38,6 +41,10 @@ static TicketError do_rw(Builder builder, int *v);
 static TicketError do_time(Builder builder, time_t *tp);
 static TicketError do_scopes(Builder builder);
 
+/*
+ * digittoint was missing in some compile environments, so we supply
+ * our own.
+ */
 static int my_digittoint(char ch) {
   int d = ch - '0';
   if ((unsigned) d < 10) {
@@ -78,17 +85,20 @@ char* ticket_strerror(TicketError e) {
 	/* assert(e >= OK && e <= ERROR); */
 	return error_strings[e];
 }
-TicketError ticket_from_string(Ticket ticket,char *json_string,unsigned int len) {
+
+TicketError ticket_from_string(Ticket ticket, char *json_string,size_t len) {
 	TicketError e;
 	jsmnerr_t jsmn_error;
 	struct Builder builder;
 
+	/* Initialize builder */
 	memset(&builder,0,sizeof(builder));
 
+	/* Initialize parser */
 	jsmn_init(&(builder.parser));
 	builder.ticket = ticket;
 	builder.input = json_string;
-
+	/* Initialize ticket */
 	ticket_init(builder.ticket);
 
 	if( (jsmn_error = jsmn_parse(&(builder.parser), builder.input, len, builder.tokens, MAX_TOKENS)) != JSMN_SUCCESS) {
@@ -107,8 +117,10 @@ TicketError ticket_from_string(Ticket ticket,char *json_string,unsigned int len)
 		return ERROR;
 	}
 
+	/* Make number of tokens accessible more conveniently */
 	builder.ntokens = builder.parser.toknext;
 
+	/* Build ticket from parsed JSON tokens */
 	for (builder.i = 0; builder.i< builder.parser.toknext;builder.i++) {
         jsmntok_t *t = &(builder.tokens[builder.i]);
         unsigned int length = t->end - t->start;
@@ -178,7 +190,8 @@ TicketError do_string(Builder builder, HawkcString *s) {
 	if(t->type != JSMN_STRING) {
 		return ERROR_UNEXPECTED_TOKEN_TYPE;
 	}
-   s->data = builder->input+t->start;
+	/* FIXME Cast implies data is only ascii - maybe I need to rewrite jsmn at some point */
+   s->data = (unsigned char*)builder->input+t->start;
    s->len = t->end - t->start;
    return OK;
 }
@@ -253,19 +266,20 @@ TicketError do_algo(Builder builder) {
 	if( (e = do_string(builder,&algo)) != OK) {
 		return e;
 	}
-	if( (a = hawkc_algorithm_by_name(algo.data, algo.len)) == NULL) {
+	/* FIXME Cast implies data is only ascii - maybe I need to rewrite jsmn at some point */
+	if( (a = hawkc_algorithm_by_name((char*)algo.data, algo.len)) == NULL) {
 		return ERROR_UNKNOWN_HAWK_ALGORITHM;
 	}
 	builder->ticket->hawkAlgorithm = a;
 	return OK;
 }
 
-int ticket_has_scope(Ticket ticket, unsigned char *host, unsigned int host_len, unsigned char *realm, unsigned int realm_len) {
-	unsigned int i;
-	unsigned int scope_len = host_len + 1 + realm_len; /* scope='host|realm' */
+int ticket_has_scope(Ticket ticket, unsigned char *host, size_t host_len, unsigned char *realm, size_t realm_len) {
+	size_t i;
+	size_t scope_len = host_len + 1 + realm_len; /* scope='host|realm' */
 	for(i=0;i<ticket->nscopes;i++) {
 		if(ticket->scopes[i].len == scope_len) {
-			char *s = ticket->scopes[i].data;
+			unsigned char *s = ticket->scopes[i].data;
 			if( (memcmp(s,host,host_len) == 0)
 					&& (s[host_len] == '|')
 					&& (memcmp(s+host_len+1,realm,realm_len) == 0)) {

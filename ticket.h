@@ -18,7 +18,7 @@ typedef struct Ticket {
 	HawkcString pwd;
 	int rw;
 	HawkcString scopes[MAX_SCOPES];
-	unsigned int nscopes;
+	size_t nscopes;
 	time_t exp;
 	HawkcAlgorithm hawkAlgorithm;
 } *Ticket;
@@ -40,21 +40,38 @@ typedef enum {
 	ERROR
 } TicketError;
 
+/*
+ * Obtain a string representation of the supplied error code.
+ */
 char* ticket_strerror(TicketError e);
 
 /*
  * Parse a ticket from a json string. Allocation of the ticket is the
  * responsibility of the caller. Usually, you should declare a local struct Ticket and
  * pass a pointer to that.
+ *
+ * The ticket parser supports the following JSON structure
+ *
+ * {
+ *   "client":"100001",
+ *   "user" : "77762",
+ *   "owner" : 55514,
+ *   "pwd":"w7*0T6C.0b4C#",
+ *   "scopes" ["***REMOVED***|***REMOVED***"],
+ *   "rw":false,
+ *   "exp":1405688331,
+ *   "hawkAlgorithm":"sha256"
+ * }
+ *
  */
-TicketError ticket_from_string(Ticket ticket,char *b,unsigned int len);
+TicketError ticket_from_string(Ticket ticket, char *b, size_t len);
 
 /*
  * Returns 1 if the ticket contains a scope that matches the scope implied
  * by the provided host and realm.
  * A scope name has the form host '|' realm
  */
-int ticket_has_scope(Ticket ticket, unsigned char *host, unsigned int host_len, unsigned char *realm, unsigned int realm_len);
+int ticket_has_scope(Ticket ticket, unsigned char *host, size_t host_len, unsigned char *realm, size_t realm_len);
 
 #ifdef __cplusplus
 } // extern "C"
