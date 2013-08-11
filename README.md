@@ -3,10 +3,32 @@ nginx-dlg-auth
 
 NGINX module for delegating authentication and authorization to an HTTP gateway.
 
+nginx-dlg-auth combines [Hawk](https://github.com/hueniverse/hawk) and [iron](https://github.com/hueniverse/iron) to enable authentication and
+authorization using encapsulated tokens.
+
+The token format has been inspired by [Oz](https://github.com/hueniverse/oz) but is
+different for now, because in the long run, I think I have somewhat different use
+cases than Oz is aiming at.
+
+This is all somewhat experimental and will evolve over the next months.
+
+The token format right now is
+
+    {"client":"test01","pwd":"v8(9D1A>7n9J<","scopes":["api.example.org|NEWS"],\
+    "rw":false,"exp":1405688331,"hawkAlgorithm":"sha256"}
+
+and combines password and algorithm to be used with Hawk as well as access rights
+and token expiration time.
+
+
 Status
 ======
 
-nginx-dlg-auth is in pre-release state. There hasn't been any thorough testing
+nginx-dlg-auth is in pre-release state from tghe point of view of Hawk and iron support.
+It could well be used without the specific token syntax by providing Hawk credentials
+in another way.
+
+There hasn't been any thorough testing
 so far nor is there any production experience. However, this NGINX module will
 be used in production shortly and then generate enough feedback to allow for
 aiming at a public version 1.0.
