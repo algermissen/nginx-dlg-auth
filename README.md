@@ -49,7 +49,7 @@ on your machine.
 Configure NGINX build like this:
 
 
-    ./configure --add-module=/Users/jan/Projects/NORD/ono/workspace/nginx-dlg-auth
+    ./configure --add-module=/path/to/code/nginx-dlg-auth
 
 You may also want to add the library file to $LINK_DEPS to make
 sure nginx will correctly relink itself on make if library
