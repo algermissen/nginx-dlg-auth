@@ -71,13 +71,13 @@ a set of passwordIds and password to enable password rotation.
 
 Examples
 
-    dlg_auth ***REMOVED***
+    dlg_auth NEWS 
     dlg_auth_iron_pwd z3$0O1Y]8x3T+;
     dlg_auth_allowed_clock_skew 10
 
 
 
-    dlg_auth ***REMOVED***
+    dlg_auth NEWS 
     dlg_auth_iron_pwd 100922 z3$0O1Y]8x3T+;
     dlg_auth_iron_pwd 776277 w1|6Q3V]7s8R);
     dlg_auth_iron_pwd 199289 i7(5P3D.4f0D-;
