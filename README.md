@@ -37,7 +37,7 @@ aiming at a public version 1.0.
 Installation
 ============
 
-Note: I am working on an ROM-install of NGINX including the module.
+Note: I am working on an RPM-install of NGINX including the module.
 
 This NGINX module needs [ciron](https://github.com/algermissen/ciron)
 and [hawkc](https://github.com/algermissen/hawkc). Build them separately
