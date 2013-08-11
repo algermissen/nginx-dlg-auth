@@ -497,7 +497,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, CironPwdTable 
 	 * and our current time so it understands the offset and can send the request again.
 	 */
 	time(&now);
-	if(hawkc_ctx.header_in.ts < now - allowed_clock_skew || hawkc_ctx.header_in.ts > now + allowed_clock_skew) {
+	if(hawkc_ctx.header_in.ts < now - (time_t)allowed_clock_skew || hawkc_ctx.header_in.ts > now + (time_t)allowed_clock_skew) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Clock skew too large mine: mine: %d, got %d , skew is %d" , now , hawkc_ctx.header_in.ts,
 				allowed_clock_skew);
 		hawkc_www_authenticate_header_set_ts(&hawkc_ctx,now);
@@ -624,7 +624,6 @@ static ngx_int_t ngx_dlg_auth_send_simple_401(ngx_http_request_t *r, ngx_str_t *
 static ngx_int_t ngx_dlg_auth_send_401(ngx_http_request_t *r, HawkcContext hawkc_ctx) {
 		HawkcError e;
     	ngx_str_t challenge;
-    	unsigned char *p;
     	size_t n,check_n;
 
  		if( (e = hawkc_calculate_www_authenticate_header_length(hawkc_ctx,&n)) != HAWKC_OK) {
