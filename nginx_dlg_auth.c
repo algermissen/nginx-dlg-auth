@@ -397,8 +397,6 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, CironPwdTable 
 		port.len = 2;
 	}
 
-	ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to parse Authorization header: %s" , hawkc_get_error(&hawkc_ctx));
-
 	/*
 	 * Initialize Hawkc context with original request data
 	 */
