@@ -121,7 +121,7 @@ TicketError ticket_from_string(Ticket ticket, char *json_string,size_t len) {
 	builder.ntokens = builder.parser.toknext;
 
 	/* Build ticket from parsed JSON tokens */
-	for (builder.i = 0; builder.i< builder.parser.toknext;builder.i++) {
+	for (builder.i = 0; builder.i< (size_t)builder.parser.toknext;builder.i++) {
         jsmntok_t *t = &(builder.tokens[builder.i]);
         unsigned int length = t->end - t->start;
         char *s = builder.input + t->start;
