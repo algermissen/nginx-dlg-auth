@@ -88,6 +88,18 @@ Examples
 You must not use passwords that contain ';' characters. This would probably confuse 
 nginx config parser.
 
+Variables
+=========
+
+The module sets a number of variables to make per request handling information available
+in later NGINX phases. For example, these variables can be used for logging which client
+(and/or user) made the request and, possibly, for which resource owner the pertaining
+grant had been issued.
+
+These variables are available:
+
+- $dlg_auth_client The client ID of the client that made the request.
+
 
 
 

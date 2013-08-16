@@ -9,6 +9,21 @@
 #include <ciron.h>
 #include "ticket.h"
 
+#include "nginx_dlg_auth.h"
+#include "nginx_dlg_auth_var.h"
+
+/*
+client id
+-user
+-owner
+- ticket expiry time
+- perniions, scope
+
+- unsealing time
+- hmac check time
+-
+*/
+
 /*
  * ciron user-provided buffer sizes. The size has been determined by using
  * some usual tickets, observing the required sizes and then adding a fair amount of
@@ -64,11 +79,13 @@ static char *ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *parent, void
  * Functions for request processing
  */
 static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r);
-static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, CironPwdTable pwdTable, ngx_str_t iron_password, ngx_str_t realm, ngx_uint_t allowed_clock_skew);
+static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx, CironPwdTable pwdTable, ngx_str_t iron_password, ngx_str_t realm, ngx_uint_t allowed_clock_skew);
 static void ngx_dlg_auth_rename_authorization_header(ngx_http_request_t *r);
 static ngx_int_t ngx_dlg_auth_send_simple_401(ngx_http_request_t *r, ngx_str_t *realm);
 static ngx_int_t ngx_dlg_auth_send_401(ngx_http_request_t *r, HawkcContext hawkc_ctx);
 static void get_host_and_port(ngx_str_t host_header, ngx_str_t *host, ngx_str_t *port);
+
+ngx_int_t store_client(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticket ticket);
 
 /*
  * The configuration directives
@@ -105,7 +122,7 @@ static ngx_command_t ngx_dlg_auth_commands[] = {
  * The static (configuration) module context.
  */
 static ngx_http_module_t  nginx_dlg_auth_module_ctx = {
-    NULL,                                  /* preconfiguration */
+	ngx_http_auth_dlg_add_variables,     /* preconfiguration */
     ngx_http_dlg_auth_init,              /* postconfiguration */
 
     NULL,                                  /* create main configuration */
@@ -135,6 +152,7 @@ ngx_module_t  nginx_dlg_auth_module = {
     NULL,                                  /* exit master */
     NGX_MODULE_V1_PADDING
 };
+
 
 /*
  * This function handles the dlg_auth_iron_pwd directive. If a single value
@@ -203,12 +221,14 @@ static char * ngx_http_dlg_auth_iron_passwd(ngx_conf_t *cf, ngx_command_t *cmd, 
 static ngx_int_t ngx_http_dlg_auth_init(ngx_conf_t *cf) {
     ngx_http_handler_pt        *h;
     ngx_http_core_main_conf_t  *cmcf;
+        ngx_str_t vn;
 
     cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
     if( (h = ngx_array_push(&cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers)) == NULL) {
         return NGX_ERROR;
     }
     *h = ngx_dlg_auth_handler;
+
     return NGX_OK;
 }
 
@@ -293,17 +313,28 @@ static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r) {
     ngx_int_t rc;
     ngx_uint_t allowed_clock_skew;
     CironPwdTable pwdTable;
+    ngx_http_dlg_auth_ctx_t *ctx;
 
     /*
+     * Allocate and store our per request context (used to
+     * store the data to be made accessible as variable values).
+     */
+    if( (ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_dlg_auth_ctx_t))) == NULL) {
+    	return NGX_ERROR;
+    }
+    ngx_http_set_ctx(r, ctx, nginx_dlg_auth_module);
+
+
+     /*
      * First, get the configuration and do some checking, whether
      * we actually should do anything.
      * FIXME: understand how to make directive mandatory
      */
-
     alcf = ngx_http_get_module_loc_conf(r, nginx_dlg_auth_module);
     if (alcf->realm == NULL) {
         return NGX_DECLINED;
     }
+
     /*
      * We need at single password or password table to do our work.
      * FIXME: This must be checked during startup. How?
@@ -344,7 +375,7 @@ static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r) {
     /*
      * Authenticate and authorize and 'remove' (rename) authorization header if ok.
      */
-    if( (rc =  ngx_dlg_auth_authenticate(r,pwdTable,iron_password,realm,allowed_clock_skew)) != NGX_OK) {
+    if( (rc =  ngx_dlg_auth_authenticate(r,ctx,pwdTable,iron_password,realm,allowed_clock_skew)) != NGX_OK) {
     	return rc;
     }
     ngx_dlg_auth_rename_authorization_header(r);
@@ -357,7 +388,7 @@ static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r) {
  * takes place.
  *
  */
-static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, CironPwdTable pwdTable,ngx_str_t iron_password, ngx_str_t realm,ngx_uint_t allowed_clock_skew) {
+static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx, CironPwdTable pwdTable,ngx_str_t iron_password, ngx_str_t realm,ngx_uint_t allowed_clock_skew) {
 
 	/*
 	 * Variables necessary for Hawk.
@@ -411,7 +442,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, CironPwdTable 
 	 * Parse Hawk Authorization header.
 	 */
 	if( (he = hawkc_parse_authorization_header(&hawkc_ctx,r->headers_in.authorization->value.data, r->headers_in.authorization->value.len)) != HAWKC_OK) {
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to parse Authorization header: %s" , hawkc_get_error(&hawkc_ctx));
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to parse Authorization header %V, reason: %s" ,&(r->headers_in.authorization->value), hawkc_get_error(&hawkc_ctx));
 		if(he == HAWKC_BAD_SCHEME_ERROR) {
 			return ngx_dlg_auth_send_simple_401(r,&realm);
 		}
@@ -469,6 +500,14 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, CironPwdTable 
 		x.len = output_len;
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ticket JSON: %V" , &x);
 	}
+
+	if(store_client(r,ctx,&ticket) != NGX_OK ) {
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to store client variable, storage function returned error");
+		// We can still serve the request, so no error return
+	}
+
+
+
 	/*
 	 * Now we can take password and algorithm from ticket and store them in Hawkc context.
 	 */
@@ -703,3 +742,12 @@ static void get_host_and_port(ngx_str_t host_header, ngx_str_t *host, ngx_str_t 
 		}
 	}
 
+
+ngx_int_t store_client(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticket ticket) {
+	 if( (ctx->client.data = ngx_pcalloc(r->pool, ticket->client.len)) == NULL) {
+		 return NGX_ERROR;
+	 }
+	 memcpy(ctx->client.data,ticket->client.data,ctx->client.len);
+	 ctx->client.len = ticket->client.len;
+	 return NGX_OK;
+}
