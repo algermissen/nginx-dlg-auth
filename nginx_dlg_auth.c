@@ -12,17 +12,6 @@
 #include "nginx_dlg_auth.h"
 #include "nginx_dlg_auth_var.h"
 
-/*
-client id
--user
--owner
-- ticket expiry time
-- perniions, scope
-
-- unsealing time
-- hmac check time
--
-*/
 
 /*
  * ciron user-provided buffer sizes. The size has been determined by using
@@ -86,6 +75,9 @@ static ngx_int_t ngx_dlg_auth_send_401(ngx_http_request_t *r, HawkcContext hawkc
 static void get_host_and_port(ngx_str_t host_header, ngx_str_t *host, ngx_str_t *port);
 
 ngx_int_t store_client(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticket ticket);
+ngx_int_t store_expires(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticket ticket);
+ngx_int_t store_clockskew(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx, time_t clockskew);
+
 
 /*
  * The configuration directives
@@ -417,6 +409,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	TicketError te;
 	struct Ticket ticket;
 	time_t now;
+	time_t clock_skew;
 
 	/*
 	 * Get original request host and port from host header
@@ -469,7 +462,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 				check_len);
 		return NGX_HTTP_BAD_REQUEST;
 	}
-    /* FIXME The last 0 is an issue with ciron: We won't know the password_id before unsealsing. but we need buffer sze before.
+    /* FIXME The last 0 is an issue with ciron: We won't know the password_id before unsealsing. but we need buffer size before.
      * Suggested FIX: ignore the passwordID on unsealing - hen this buffer length will always be passwordId.len too long.
      * That is not a problem! Hence we pass 0.
      * See https://github.com/algermissen/ciron/issues/15
@@ -506,6 +499,13 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 		// We can still serve the request, so no error return
 	}
 
+	if(store_expires(r,ctx,&ticket) != NGX_OK ) {
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to store expires variable, storage function returned error");
+		// We can still serve the request, so no error return
+	}
+
+
+
 
 
 	/*
@@ -528,15 +528,25 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 		return ngx_dlg_auth_send_simple_401(r,&realm);
 	}
 
+
+	time(&now);
+	clock_skew = now - hawkc_ctx.header_in.ts;
+	if(store_clockskew(r,ctx,clock_skew) != NGX_OK) {
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to store clock_skew variable, storage function returned error");
+			// We can still serve the request, so no error return
+		}
+
 	/*
 	 * Check request timestamp, allowing for some skew.
 	 * If the client's clock differs to much from the server's clock, we send the client a 401
 	 * and our current time so it understands the offset and can send the request again.
 	 */
-	time(&now);
+	/* FIXME
 	if(hawkc_ctx.header_in.ts < now - (time_t)allowed_clock_skew || hawkc_ctx.header_in.ts > now + (time_t)allowed_clock_skew) {
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Clock skew too large mine: mine: %d, got %d , skew is %d" , now , hawkc_ctx.header_in.ts,
-				allowed_clock_skew);
+	*/
+	if(abs(clock_skew) > (time_t)allowed_clock_skew) {
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Clock skew too large mine: %d, got %d ,skew is %d" , now , hawkc_ctx.header_in.ts,
+				clock_skew);
 		hawkc_www_authenticate_header_set_ts(&hawkc_ctx,now);
 		return ngx_dlg_auth_send_401(r, &hawkc_ctx);
 	}
@@ -744,10 +754,33 @@ static void get_host_and_port(ngx_str_t host_header, ngx_str_t *host, ngx_str_t 
 
 
 ngx_int_t store_client(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticket ticket) {
+
 	 if( (ctx->client.data = ngx_pcalloc(r->pool, ticket->client.len)) == NULL) {
 		 return NGX_ERROR;
 	 }
-	 memcpy(ctx->client.data,ticket->client.data,ctx->client.len);
+	 memcpy(ctx->client.data,ticket->client.data,ticket->client.len);
 	 ctx->client.len = ticket->client.len;
 	 return NGX_OK;
 }
+
+ngx_int_t store_expires(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticket ticket) {
+
+	 /* 20 bytes is plenty for time_t value */
+	 if( (ctx->expires.data = ngx_pcalloc(r->pool, 20)) == NULL) {
+		 return NGX_ERROR;
+	 }
+	 ctx->expires.len = hawkc_ttoa(ctx->expires.data,ticket->exp);
+	 return NGX_OK;
+}
+
+ngx_int_t store_clockskew(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx, time_t clockskew) {
+
+	 /* 20 bytes is plenty for time_t value */
+	 if( (ctx->clockskew.data = ngx_pcalloc(r->pool, 20)) == NULL) {
+		 return NGX_ERROR;
+	 }
+	 ctx->clockskew.len = hawkc_ttoa(ctx->clockskew.data,clockskew);
+	 return NGX_OK;
+}
+
+

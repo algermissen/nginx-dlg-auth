@@ -99,6 +99,8 @@ grant had been issued.
 These variables are available:
 
 - $dlg_auth_client The client ID of the client that made the request.
+- $dlg_auth_expires The expire timestamp of the ticket used for the request.
+- $dlg_auth_clockskew The skew of the client clock relative to the server clock.
 
 
 
