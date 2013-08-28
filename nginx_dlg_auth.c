@@ -485,13 +485,6 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to parse ticket JSON, %s" , ticket_strerror(te));
 		return NGX_HTTP_BAD_REQUEST;
 	}
-	/* Debug code for ticket. FIXME remove */
-	{
-		ngx_str_t x;
-		x.data = output_buffer;
-		x.len = output_len;
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ticket JSON: %V" , &x);
-	}
 
 	if(store_client(r,ctx,&ticket) != NGX_OK ) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to store client variable, storage function returned error");
