@@ -586,10 +586,6 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 		return ngx_dlg_auth_send_simple_401(r,&realm);
 	}
 
-
-	ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "Hawk access using token; client=%V, expires=%d rw=%s" ,
-			&(ticket.client) , ticket.exp , ticket.rw ? "true" : "false");
-
 	return NGX_OK;
 }
 
@@ -624,7 +620,6 @@ static void ngx_dlg_auth_rename_authorization_header(ngx_http_request_t *r) {
    		data = (ngx_table_elt_t*)elt;
 
    		if(data->key.len == 13 && memcmp(data->lowcase_key,"authorization",13) == 0) {
-   			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, " Removing Authorization request header");
    			memcpy(data->key.data,"X-",2);
    			memcpy(data->lowcase_key,"x-",2);
    			r->headers_in.authorization = NULL;
