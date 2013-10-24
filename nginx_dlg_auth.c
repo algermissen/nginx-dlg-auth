@@ -42,7 +42,7 @@
  */
 typedef struct {
 	/* Authentication realm a given ticket must grant access to */
-    ngx_http_complex_value_t  *realm;
+    ngx_str_t realm;
 
     /* iron password to unseal received access tickets. */
     ngx_str_t iron_password;
@@ -74,7 +74,7 @@ static char *ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *parent, void
  * Functions for request processing
  */
 static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r);
-static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r,ngx_http_dlg_auth_loc_conf_t *conf, ngx_http_dlg_auth_ctx_t *ctx, CironPwdTable pwdTable, ngx_str_t iron_password, ngx_str_t realm, ngx_uint_t allowed_clock_skew);
+static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r,ngx_http_dlg_auth_loc_conf_t *conf, ngx_http_dlg_auth_ctx_t *ctx);
 static void ngx_dlg_auth_rename_authorization_header(ngx_http_request_t *r);
 static ngx_int_t ngx_dlg_auth_send_simple_401(ngx_http_request_t *r, ngx_str_t *realm);
 static ngx_int_t ngx_dlg_auth_send_401(ngx_http_request_t *r, HawkcContext hawkc_ctx);
@@ -88,7 +88,6 @@ ngx_int_t store_client(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticke
 ngx_int_t store_expires(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticket ticket);
 ngx_int_t store_clockskew(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx, time_t clockskew);
 
-
 /*
  * The configuration directives
  */
@@ -97,7 +96,7 @@ static ngx_command_t ngx_dlg_auth_commands[] = {
 	{ ngx_string("dlg_auth"),
 	  NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LMT_CONF
 	                       |NGX_CONF_TAKE1,
-	  ngx_http_set_complex_value_slot,
+      ngx_conf_set_str_slot,
 	  NGX_HTTP_LOC_CONF_OFFSET,
 	  offsetof(ngx_http_dlg_auth_loc_conf_t, realm),
 	  NULL },
@@ -189,7 +188,7 @@ static char * ngx_http_dlg_auth_iron_passwd(ngx_conf_t *cf, ngx_command_t *cmd, 
     value = cf->args->elts;
 
     /*
-     * Single passord case.
+     * Single password case.
      */
     if(cf->args->nelts == 2) {
     	if(lcf->iron_password.len != 0) {
@@ -235,7 +234,7 @@ static char * ngx_http_dlg_auth_iron_passwd(ngx_conf_t *cf, ngx_command_t *cmd, 
 
 /*
  * Initialization function to register handler to
- * access phase.
+ * nginx access phase.
  */
 static ngx_int_t ngx_http_dlg_auth_init(ngx_conf_t *cf) {
     ngx_http_handler_pt        *h;
@@ -258,8 +257,9 @@ static void *ngx_http_dlg_auth_create_loc_conf(ngx_conf_t *cf) {
     if( (conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_dlg_auth_loc_conf_t))) == NULL) {
         return NULL;
     }
-
-    conf->realm = NULL;
+    /* Initialize realm */
+    conf->realm.len = 0;
+    conf->realm.data = NULL;
 
     /* Initialize password */
     conf->iron_password.len = 0;
@@ -289,8 +289,9 @@ static char * ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *vparent, vo
     ngx_http_dlg_auth_loc_conf_t  *parent = (ngx_http_dlg_auth_loc_conf_t*)vparent;
     ngx_http_dlg_auth_loc_conf_t  *child = (ngx_http_dlg_auth_loc_conf_t*)vchild;
     /* Merge realm */
-    if (child->realm == NULL) {
-        child->realm = parent->realm;
+    if (child->realm.len == 0) {
+        child->realm.len = parent->realm.len;
+        child->realm.data = parent->realm.data;
     }
     /* Merge single password, if any */
     if (child->iron_password.len == 0) {
@@ -347,12 +348,8 @@ static char * ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *vparent, vo
  * request)
  */
 static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r) {
-    ngx_http_dlg_auth_loc_conf_t  *alcf;
-    ngx_str_t realm;
-    ngx_str_t iron_password;
+    ngx_http_dlg_auth_loc_conf_t  *conf;
     ngx_int_t rc;
-    ngx_uint_t allowed_clock_skew;
-    CironPwdTable pwdTable;
     ngx_http_dlg_auth_ctx_t *ctx;
 
     /*
@@ -364,58 +361,46 @@ static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r) {
     }
     ngx_http_set_ctx(r, ctx, nginx_dlg_auth_module);
 
-
-     /*
-     * First, get the configuration and do some checking, whether
-     * we actually should do anything.
-     * FIXME: understand how to make directive mandatory
+    /*
+     * First, get the configuration and check whether we apply to
+     * the current location.
      */
-    alcf = ngx_http_get_module_loc_conf(r, nginx_dlg_auth_module);
-    if (alcf->realm == NULL) {
+    conf = ngx_http_get_module_loc_conf(r, nginx_dlg_auth_module);
+    if (conf->realm.data == NULL) {
         return NGX_DECLINED;
     }
 
     /*
      * We need at single password or password table to do our work.
-     * FIXME: This must be checked during startup. How?
+     * But see https://github.com/algermissen/nginx-dlg-auth/issues/10 - this should be
+     * checked at startup time.
      */
-    if (alcf->iron_password.len == 0 && alcf->pwd_table.nentries == 0) {
+    if (conf->iron_password.len == 0 && conf->pwd_table.nentries == 0) {
     	ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "dlg_auth_iron_pwd directive required at least once.");
         return NGX_ERROR;
     }
 
-    if (ngx_http_complex_value(r, alcf->realm, &realm) != NGX_OK) {
-        return NGX_ERROR;
-    }
     /*
-     * User can disable ourselves by setting the realm to 'off'
+     * User can disable ourselves by setting the realm to 'off'. This includes
+     * terminating inheritance.
+     * But see https://github.com/algermissen/nginx-dlg-auth/issues/14
      */
-    if (realm.len == 3 && ngx_strncmp(realm.data, "off", 3) == 0) {
+    if (conf->realm.len == 3 && ngx_strncmp(conf->realm.data, "off", 3) == 0) {
         return NGX_DECLINED;
     }
-
-    /* Populate local reference to password */
-    iron_password.len = alcf->iron_password.len;
-    iron_password.data = alcf->iron_password.data;
-
-    /* Populate password table pointer */
-    pwdTable = &(alcf->pwd_table);
-
-    /* .. and clock skew */
-    allowed_clock_skew = alcf->allowed_clock_skew;
 
     /*
      * Authorization header presence is required, of course.
      */
 
     if (r->headers_in.authorization == NULL) {
-    	return ngx_dlg_auth_send_simple_401(r,&realm);
+    	return ngx_dlg_auth_send_simple_401(r,&(conf->realm));
     }
 
     /*
      * Authenticate and authorize and 'remove' (rename) authorization header if ok.
      */
-    if( (rc =  ngx_dlg_auth_authenticate(r,alcf,ctx,pwdTable,iron_password,realm,allowed_clock_skew)) != NGX_OK) {
+    if( (rc =  ngx_dlg_auth_authenticate(r,conf,ctx)) != NGX_OK) {
     	return rc;
     }
     ngx_dlg_auth_rename_authorization_header(r);
@@ -428,7 +413,7 @@ static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r) {
  * takes place.
  *
  */
-static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_auth_loc_conf_t *conf,ngx_http_dlg_auth_ctx_t *ctx, CironPwdTable pwdTable,ngx_str_t iron_password, ngx_str_t realm,ngx_uint_t allowed_clock_skew) {
+static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_auth_loc_conf_t *conf,ngx_http_dlg_auth_ctx_t *ctx) {
 
 	/*
 	 * Variables necessary for Hawk.
@@ -479,7 +464,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	if( (he = hawkc_parse_authorization_header(&hawkc_ctx,r->headers_in.authorization->value.data, r->headers_in.authorization->value.len)) != HAWKC_OK) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to parse Authorization header %V, reason: %s" ,&(r->headers_in.authorization->value), hawkc_get_error(&hawkc_ctx));
 		if(he == HAWKC_BAD_SCHEME_ERROR) {
-			return ngx_dlg_auth_send_simple_401(r,&realm);
+			return ngx_dlg_auth_send_simple_401(r,&(conf->realm));
 		}
 		if(he == HAWKC_PARSE_ERROR) {
 			return NGX_HTTP_BAD_REQUEST;
@@ -519,7 +504,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	 * The sealed ticket is the Hawk id parameter. We unseal it, parse the ticket JSON
 	 * and extract password and algorithm to validate the Hawk signature.
 	 */
-	if( (ce =ciron_unseal(&ciron_ctx,hawkc_ctx.header_in.id.data, hawkc_ctx.header_in.id.len, pwdTable,iron_password.data, iron_password.len,
+	if( (ce =ciron_unseal(&ciron_ctx,hawkc_ctx.header_in.id.data, hawkc_ctx.header_in.id.len, &(conf->pwd_table),conf->iron_password.data, conf->iron_password.len,
 			encryption_options, integrity_options, encryption_buffer, output_buffer, &output_len)) != CIRON_OK) {
 			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to unseal ticket: %s" , ciron_get_error(&ciron_ctx));
 			return NGX_HTTP_BAD_REQUEST;
@@ -560,7 +545,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	}
 	if(!hmac_is_valid) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Invalid signature in %V" ,&(r->headers_in.authorization->value) );
-		return ngx_dlg_auth_send_simple_401(r,&realm);
+		return ngx_dlg_auth_send_simple_401(r,&(conf->realm));
 	}
 
 
@@ -576,10 +561,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	 * If the client's clock differs to much from the server's clock, we send the client a 401
 	 * and our current time so it understands the offset and can send the request again.
 	 */
-	/* FIXME
-	if(hawkc_ctx.header_in.ts < now - (time_t)allowed_clock_skew || hawkc_ctx.header_in.ts > now + (time_t)allowed_clock_skew) {
-	*/
-	if(abs(clock_skew) > (time_t)allowed_clock_skew) {
+	if(abs(clock_skew) > (time_t)(conf->allowed_clock_skew)) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Clock skew too large mine: %d, got %d ,skew is %d" , now , hawkc_ctx.header_in.ts,
 				clock_skew);
 		hawkc_www_authenticate_header_set_ts(&hawkc_ctx,now);
@@ -610,16 +592,16 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	if(ticket.exp < now) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Ticket has expired");
 		/* FIXME: probably set defined error code in auth header. This is a todo for the overall auth delegation (e.g. Oz) */
-		return ngx_dlg_auth_send_simple_401(r,&realm);
+		return ngx_dlg_auth_send_simple_401(r,&(conf->realm));
 
 	}
 
 	/*
 	 * Now we check whether the ticket applies to the necessary scope.
 	 */
-	if(!ticket_has_scope(&ticket,host.data, host.len,realm.data,realm.len)) {
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Ticket does not represent grant for access to scope %V" ,&(realm) );
-		return ngx_dlg_auth_send_simple_401(r,&realm);
+	if(!ticket_has_scope(&ticket,host.data, host.len,conf->realm.data,conf->realm.len)) {
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Ticket does not represent grant for access to scope %V" ,&(conf->realm) );
+		return ngx_dlg_auth_send_simple_401(r,&(conf->realm));
 	}
 
 	return NGX_OK;
@@ -866,6 +848,9 @@ static void get_host_and_port(ngx_str_t host_header, ngx_str_t *host, ngx_str_t 
 }
 
 
+/*
+ * Store the requesting client name in a variable.
+ */
 ngx_int_t store_client(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticket ticket) {
 
 	 if( (ctx->client.data = ngx_pcalloc(r->pool, ticket->client.len)) == NULL) {
@@ -876,6 +861,9 @@ ngx_int_t store_client(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticke
 	 return NGX_OK;
 }
 
+/*
+ * Store the expiry seconds of the ticket in a variable.
+ */
 ngx_int_t store_expires(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticket ticket) {
 
 	 /* 20 bytes is plenty for time_t value */
@@ -886,6 +874,9 @@ ngx_int_t store_expires(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Tick
 	 return NGX_OK;
 }
 
+/*
+ * Store the clock skew in a variable.
+ */
 ngx_int_t store_clockskew(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx, time_t clockskew) {
 
 	 /* 20 bytes is plenty for time_t value */
