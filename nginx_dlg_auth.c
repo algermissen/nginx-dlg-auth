@@ -37,6 +37,8 @@
 		((m) == NGX_HTTP_PROPFIND) \
 		))
 
+#define MAX_PWD_TAB_ENTRIES 100
+
 /*
  * Module per-location configuration.
  */
@@ -48,7 +50,7 @@ typedef struct {
     ngx_str_t iron_password;
 
     /* iron password table for password rotation */
-    struct CironPwdTableEntry pwd_table_entries[100];
+    struct CironPwdTableEntry pwd_table_entries[MAX_PWD_TAB_ENTRIES];
     struct CironPwdTable pwd_table;
 
     /* Allowed skew when comparing request timestamp with our own clock */
@@ -210,13 +212,10 @@ static char * ngx_http_dlg_auth_iron_passwd(ngx_conf_t *cf, ngx_command_t *cmd, 
     		ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "dlg_auth_iron_pwd directive does not allow mixed use of password table and single password");
     		return NGX_CONF_ERROR;
     	}
-    	/* FIXME: add size check for entry tab
-    	 * See https://github.com/algermissen/nginx-dlg-auth/issues/9
-    	 * if( lcf->pwd_table.nentries == FIXME) {
-    	 *    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "Number of password table entries exceeds limit of %d", FIXME);
-    	 *    return NGX_ERROR;
-    	 * }
-    	*/
+    	if(lcf->pwd_table.nentries == MAX_PWD_TAB_ENTRIES) {
+    		ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "Too many dlg_auth_iron_pwd directives, please use less id/password pairs");
+    		return NGX_CONF_ERROR;
+    	}
     	i = lcf->pwd_table.nentries;
     	/* value[1] is password ID, value[2] is password */
     	lcf->pwd_table.entries[i].password_id_len = value[1].len;
