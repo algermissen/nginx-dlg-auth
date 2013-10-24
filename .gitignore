@@ -15,5 +15,6 @@ Makefile.in
 old_nginx_dlg_auth.c
 .project
 .cproject
+.idea
 ngx_test.c
 backup_with_stuff_of_nginx_dlg_auth.c

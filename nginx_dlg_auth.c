@@ -54,6 +54,12 @@ typedef struct {
     /* Allowed skew when comparing request timestamp with our own clock */
     ngx_uint_t allowed_clock_skew;
 
+    /* Host to use for signature validation instead of request host */
+    ngx_str_t  host;
+
+    /* Port to use for signature validation instead of request port */
+    ngx_str_t  port;
+
 } ngx_http_dlg_auth_loc_conf_t;
 
 
@@ -68,12 +74,16 @@ static char *ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *parent, void
  * Functions for request processing
  */
 static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r);
-static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx, CironPwdTable pwdTable, ngx_str_t iron_password, ngx_str_t realm, ngx_uint_t allowed_clock_skew);
+static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r,ngx_http_dlg_auth_loc_conf_t *conf, ngx_http_dlg_auth_ctx_t *ctx, CironPwdTable pwdTable, ngx_str_t iron_password, ngx_str_t realm, ngx_uint_t allowed_clock_skew);
 static void ngx_dlg_auth_rename_authorization_header(ngx_http_request_t *r);
 static ngx_int_t ngx_dlg_auth_send_simple_401(ngx_http_request_t *r, ngx_str_t *realm);
 static ngx_int_t ngx_dlg_auth_send_401(ngx_http_request_t *r, HawkcContext hawkc_ctx);
+static void determine_host_and_port(ngx_http_dlg_auth_loc_conf_t *conf, ngx_http_request_t *r,ngx_str_t *host, ngx_str_t *port);
 static void get_host_and_port(ngx_str_t host_header, ngx_str_t *host, ngx_str_t *port);
 
+/*
+ * Functions for variable setting.
+ */
 ngx_int_t store_client(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticket ticket);
 ngx_int_t store_expires(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticket ticket);
 ngx_int_t store_clockskew(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx, time_t clockskew);
@@ -106,6 +116,23 @@ static ngx_command_t ngx_dlg_auth_commands[] = {
 	        NGX_HTTP_LOC_CONF_OFFSET,
 	        offsetof(ngx_http_dlg_auth_loc_conf_t, allowed_clock_skew),
 	        NULL },
+
+
+    { ngx_string("dlg_auth_host"),
+    	  NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LMT_CONF
+    	                       |NGX_CONF_TAKE1,
+    	  ngx_conf_set_str_slot,
+    	  NGX_HTTP_LOC_CONF_OFFSET,
+    	  offsetof(ngx_http_dlg_auth_loc_conf_t, host),
+    	  NULL },
+
+    { ngx_string("dlg_auth_port"),
+    	  NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LMT_CONF
+    	                       |NGX_CONF_TAKE1,
+    	  ngx_conf_set_str_slot,
+    	  NGX_HTTP_LOC_CONF_OFFSET,
+    	  offsetof(ngx_http_dlg_auth_loc_conf_t, port),
+    	  NULL },
 
     ngx_null_command /* command termination */
 };
@@ -231,6 +258,9 @@ static void *ngx_http_dlg_auth_create_loc_conf(ngx_conf_t *cf) {
     if( (conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_dlg_auth_loc_conf_t))) == NULL) {
         return NULL;
     }
+
+    conf->realm = NULL;
+
     /* Initialize password */
     conf->iron_password.len = 0;
     conf->iron_password.data = NULL;
@@ -241,6 +271,13 @@ static void *ngx_http_dlg_auth_create_loc_conf(ngx_conf_t *cf) {
 
     /* Initialize clock skew */
     conf->allowed_clock_skew = NGX_CONF_UNSET_UINT;
+
+    /* Initialize explicit signature verification host and port */
+    conf->host.len = 0;
+    conf->host.data = NULL;
+    conf->port.len = 0;
+    conf->port.data = NULL;
+
     return conf;
 }
 
@@ -277,6 +314,18 @@ static char * ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *vparent, vo
      * Inherit or set default allowed clock skew of 1s.
      */
     ngx_conf_merge_uint_value(child->allowed_clock_skew, parent->allowed_clock_skew, 1);
+
+    /*
+     * Inherit explicit request signature host and port setting.
+     */
+    if (child->host.len == 0) {
+        child->host.len = parent->host.len;
+        child->host.data = parent->host.data;
+    }
+    if (child->port.len == 0) {
+        child->port.len = parent->port.len;
+        child->port.data = parent->port.data;
+    }
     return NGX_CONF_OK;
 }
 
@@ -366,7 +415,7 @@ static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r) {
     /*
      * Authenticate and authorize and 'remove' (rename) authorization header if ok.
      */
-    if( (rc =  ngx_dlg_auth_authenticate(r,ctx,pwdTable,iron_password,realm,allowed_clock_skew)) != NGX_OK) {
+    if( (rc =  ngx_dlg_auth_authenticate(r,alcf,ctx,pwdTable,iron_password,realm,allowed_clock_skew)) != NGX_OK) {
     	return rc;
     }
     ngx_dlg_auth_rename_authorization_header(r);
@@ -379,7 +428,7 @@ static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r) {
  * takes place.
  *
  */
-static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx, CironPwdTable pwdTable,ngx_str_t iron_password, ngx_str_t realm,ngx_uint_t allowed_clock_skew) {
+static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_auth_loc_conf_t *conf,ngx_http_dlg_auth_ctx_t *ctx, CironPwdTable pwdTable,ngx_str_t iron_password, ngx_str_t realm,ngx_uint_t allowed_clock_skew) {
 
 	/*
 	 * Variables necessary for Hawk.
@@ -410,20 +459,14 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	time_t now;
 	time_t clock_skew;
 
-	/*
-	 * Get original request host and port from host header
-	 * FIXME Please see https://github.com/algermissen/nginx-dlg-auth/issues/5
-	 */
-	get_host_and_port(r->headers_in.host->value,&host,&port);
-	if(port.len == 0) {
-		port.data = (u_char*)"80"; /* Default HTTP port */
-		port.len = 2;
-	}
+    /*
+     * Determine the host and port values to be used for signature validation.
+     */
+	determine_host_and_port(conf,r,&host,&port);
 
 	/*
 	 * Initialize Hawkc context with original request data
 	 */
-
 	hawkc_context_init(&hawkc_ctx);
 	hawkc_context_set_method(&hawkc_ctx,r->method_name.data, r->method_name.len);
 	hawkc_context_set_path(&hawkc_ctx,r->unparsed_uri.data, r->unparsed_uri.len);
@@ -705,6 +748,70 @@ static ngx_int_t ngx_dlg_auth_send_401(ngx_http_request_t *r, HawkcContext hawkc
 }
 
 
+/*
+ * Determine the host and port to use for request signature validation.
+ */
+static void determine_host_and_port(ngx_http_dlg_auth_loc_conf_t *conf,
+                            ngx_http_request_t *r,ngx_str_t *host, ngx_str_t *port) {
+    ngx_str_t request_host;
+    ngx_str_t request_port;
+    /*
+     * Initialize, so that we can safely check xxx->len for 0.
+     */
+    host->len = 0;
+    host->data = NULL;
+    port->len = 0;
+    port->data = NULL;
+
+    /*
+     * Handle any explicitly set values for host or port.
+     */
+    if(conf->host.len != 0) {
+        host->data = conf->host.data;
+        host->len = conf->host.len;
+    }
+    if(conf->port.len != 0) {
+        host->data = conf->port.data;
+        host->len = conf->port.len;
+    }
+
+
+    /*
+     * If host and port have both been explicitly set in configuration, we are done at
+     * this point.
+     */
+    if(host->len != 0 && port->len != 0) {
+        return;
+    }
+
+    /*
+     * Maybe add support for X-Forwarded-Host & freinds.
+     * See https://github.com/algermissen/nginx-dlg-auth/issues/12
+     */
+
+    /*
+     * Extract host and port from request.
+     */
+    get_host_and_port(r->headers_in.host->value,&request_host,&request_port);
+
+    /*
+     * If host or port has not been explicitly set in configuration file or has been
+     * determined otherwise (e.g. X-Forwarded-Host & friends) finally use the
+     * host and/or port from the request.
+     */
+    if(host->len != 0) {
+        host->data = request_host.data;
+        host->len = request_host.len;
+    }
+
+    if(port->len != 0) {
+        port->data = request_port.data;
+        port->len = request_port.len;
+    }
+
+
+
+}
 
 
 /*
@@ -714,30 +821,49 @@ static ngx_int_t ngx_dlg_auth_send_401(ngx_http_request_t *r, HawkcContext hawkc
  * they are responsible for setting the default port.
  */
 static void get_host_and_port(ngx_str_t host_header, ngx_str_t *host, ngx_str_t *port) {
-		u_char *p;
-		unsigned int i;
-		port->len = 0;
-		p = host_header.data;
-		/* Extract host */
-		host->data = p;
-		i=0;
-		while(i < host_header.len && *p != ':') {
+    u_char *p;
+    unsigned int i;
+    port->len = 0;
+    p = host_header.data;
+    /* Extract host */
+    host->data = p;
+    i=0;
+    while(i < host_header.len && *p != ':') {
+        p++;
+        i++;
+    }
+	host->len = i;
+	/* If we found delimiter and still have stuff to read, process port. */
+	if(*p == ':' && i+1<host_header.len) {
+		p++;
+		i++;
+		port->data = p;
+		while(i < host_header.len) {
 			p++;
 			i++;
-		}
-		host->len = i;
-		/* If we found delimiter and still have stuff to read, process port. */
-		if(*p == ':' && i+1<host_header.len) {
-			p++;
-			i++;
-			port->data = p;
-			while(i < host_header.len) {
-				p++;
-				i++;
-				port->len++;
-			}
+			port->len++;
 		}
 	}
+
+    /*
+     * If there is no request port given in the Host header, use the URI scheme specific
+     * default port.
+     */
+     if(port->len == 0) {
+#if (NGX_HTTP_SSL)
+        if(r->connection->ssl) {
+            port->data = (u_char *)"443";
+            port->len = 3;
+        } else {
+#endif
+                port->data = (u_char *)"80";
+                port->len = 2;
+#if (NGX_HTTP_SSL)
+        }
+#endif
+    }
+
+}
 
 
 ngx_int_t store_client(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticket ticket) {
