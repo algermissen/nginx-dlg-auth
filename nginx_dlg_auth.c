@@ -398,16 +398,6 @@ static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r) {
     }
 
     /*
-     * We need at single password or password table to do our work.
-     * But see https://github.com/algermissen/nginx-dlg-auth/issues/10 - this should be
-     * checked at startup time.
-     */
-    if (conf->iron_password.len == 0 && conf->pwd_table.nentries == 0) {
-    	ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "dlg_auth_iron_pwd directive required at least once.");
-        return NGX_ERROR;
-    }
-
-    /*
      * User can disable ourselves by setting the realm to 'off'. This includes
      * terminating inheritance.
      * But see https://github.com/algermissen/nginx-dlg-auth/issues/14
@@ -543,17 +533,13 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 
 	if(store_client(r,ctx,&ticket) != NGX_OK ) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to store client variable, storage function returned error");
-		// We can still serve the request, so no error return
+		// We can still serve the request despite this error, so no error return
 	}
 
 	if(store_expires(r,ctx,&ticket) != NGX_OK ) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to store expires variable, storage function returned error");
-		// We can still serve the request, so no error return
+		// We can still serve the request despite this error, so no error return
 	}
-
-
-
-
 
 	/*
 	 * Now we can take password and algorithm from ticket and store them in Hawkc context.
@@ -575,13 +561,12 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 		return ngx_dlg_auth_send_simple_401(r,&(conf->realm));
 	}
 
-
 	time(&now);
 	clock_skew = now - hawkc_ctx.header_in.ts;
 	if(store_clockskew(r,ctx,clock_skew) != NGX_OK) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to store clock_skew variable, storage function returned error");
-			// We can still serve the request, so no error return
-		}
+		// We can still serve the request, so no error return
+	}
 
 	/*
 	 * Check request timestamp, allowing for some skew.
