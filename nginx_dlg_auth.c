@@ -72,6 +72,7 @@ static char * ngx_http_dlg_auth_iron_passwd(ngx_conf_t *cf, ngx_command_t *cmd, 
 static ngx_int_t ngx_http_dlg_auth_init(ngx_conf_t *cf);
 static void *ngx_http_dlg_auth_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child);
+static int is_digits_only(ngx_str_t *str);
 /*
  * Functions for request processing
  */
@@ -287,6 +288,7 @@ static void *ngx_http_dlg_auth_create_loc_conf(ngx_conf_t *cf) {
 static char * ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *vparent, void *vchild) {
     ngx_http_dlg_auth_loc_conf_t  *parent = (ngx_http_dlg_auth_loc_conf_t*)vparent;
     ngx_http_dlg_auth_loc_conf_t  *child = (ngx_http_dlg_auth_loc_conf_t*)vchild;
+
     /* Merge realm */
     if (child->realm.len == 0) {
         child->realm.len = parent->realm.len;
@@ -310,6 +312,9 @@ static char * ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *vparent, vo
     	child->pwd_table.nentries = parent->pwd_table.nentries;
     }
 
+
+
+
     /*
      * Inherit or set default allowed clock skew of 1s.
      */
@@ -326,8 +331,31 @@ static char * ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *vparent, vo
         child->port.len = parent->port.len;
         child->port.data = parent->port.data;
     }
+
+    /*
+     * If dlg_auth module applies to this location, perform some config sanity checks.
+     */
+
+    if(child->realm.len != 0) {
+        /* We need iron password or password table */
+        if(child->iron_password.len == 0 && child->pwd_table.nentries == 0) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "Neither iron password nor iron password table configured");
+       	    return NGX_CONF_ERROR;
+        }
+        /* Check that explicit port is a number value
+         * (nginx int value support is not used for easier use of Hawk libs)
+         */
+        if(child->port.len > 0) {
+            if( ! is_digits_only(&(child->port))) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%V is not a valid port number" , &(child->port));
+       	        return NGX_CONF_ERROR;
+       	    }
+        }
+    }
     return NGX_CONF_OK;
 }
+
+
 
 /*
  * The actual handler - this is called during access phase.
@@ -884,6 +912,22 @@ ngx_int_t store_clockskew(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx, t
 	 }
 	 ctx->clockskew.len = hawkc_ttoa(ctx->clockskew.data,clockskew);
 	 return NGX_OK;
+}
+
+/*
+ * Check whether a string represents a number greater or equal to 0.
+ * Returns 1 if string is number greater or equal to 0, 0 otherwise.
+ */
+static int is_digits_only(ngx_str_t *str) {
+    int i=0;
+    while(i < str->len ) {
+        char c = str->data[i];
+        if( c < '0' || c > '9') {
+            return 0;
+        }
+        i++;
+    }
+    return 1;
 }
 
 
