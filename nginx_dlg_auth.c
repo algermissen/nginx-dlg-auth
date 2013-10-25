@@ -765,8 +765,8 @@ static void determine_host_and_port(ngx_http_dlg_auth_loc_conf_t *conf,
         host->len = conf->host.len;
     }
     if(conf->port.len != 0) {
-        host->data = conf->port.data;
-        host->len = conf->port.len;
+        port->data = conf->port.data;
+        port->len = conf->port.len;
     }
 
 
@@ -793,17 +793,15 @@ static void determine_host_and_port(ngx_http_dlg_auth_loc_conf_t *conf,
      * determined otherwise (e.g. X-Forwarded-Host & friends) finally use the
      * host and/or port from the request.
      */
-    if(host->len != 0) {
+    if(host->len == 0) {
         host->data = request_host.data;
         host->len = request_host.len;
     }
 
-    if(port->len != 0) {
+    if(port->len == 0) {
         port->data = request_port.data;
         port->len = request_port.len;
     }
-
-
 
 }
 
