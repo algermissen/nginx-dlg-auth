@@ -287,7 +287,6 @@ static void *ngx_http_dlg_auth_create_loc_conf(ngx_conf_t *cf) {
  * specifically.
  */
 static char * ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *vparent, void *vchild) {
-    ngx_str_t var;
     ngx_http_dlg_auth_loc_conf_t  *parent = (ngx_http_dlg_auth_loc_conf_t*)vparent;
     ngx_http_dlg_auth_loc_conf_t  *child = (ngx_http_dlg_auth_loc_conf_t*)vchild;
 
