@@ -70,13 +70,33 @@ NGINX Module Configuration
 
 ## dlg_auth
 
+Enables access delegation checking. The parameter is the authentication realm.
+Tickets must inlcude this realm in their scope list to gain access.
+
 If dlg_auth is missing or if realm is 'off', the module will not be enabled.
+The 'off' value can be used to disable authentication checking in locations
+that have parent locations that enable checking.
 
 ## dlg_auth_iron_pwd
 
 You can use dlg_auth_iron_pwd to either set a single password, or to provide
 a set of passwordIds and password to enable password rotation.
 
+
+## dlg_auth_allowed_clock_skew 
+
+Explicitly set the allowed clock skew in seconds. The default is 1 second.
+
+If you set this to 0 clock skew will not be checed. This is useful for
+monitoring checks.
+
+## dlg_auth_host <hostname>
+
+Explicitly set the host used for signature validation.
+
+## dlg_auth_port <port>
+
+Explicitly set the port used for signature validation.
 
 
 Examples
