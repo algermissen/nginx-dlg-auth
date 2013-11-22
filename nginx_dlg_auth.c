@@ -911,7 +911,7 @@ ngx_int_t store_clockskew(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx, t
  * Returns 1 if string is number greater or equal to 0, 0 otherwise.
  */
 static int is_digits_only(ngx_str_t *str) {
-    int i=0;
+    unsigned int i=0;
     while(i < str->len ) {
         char c = str->data[i];
         if( c < '0' || c > '9') {
