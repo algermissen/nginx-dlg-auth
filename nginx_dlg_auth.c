@@ -82,7 +82,7 @@ static void ngx_dlg_auth_rename_authorization_header(ngx_http_request_t *r);
 static ngx_int_t ngx_dlg_auth_send_simple_401(ngx_http_request_t *r, ngx_str_t *realm);
 static ngx_int_t ngx_dlg_auth_send_401(ngx_http_request_t *r, HawkcContext hawkc_ctx);
 static void determine_host_and_port(ngx_http_dlg_auth_loc_conf_t *conf, ngx_http_request_t *r,ngx_str_t *host, ngx_str_t *port);
-static void get_host_and_port(ngx_str_t host_header, ngx_str_t *host, ngx_str_t *port);
+static void get_host_and_port(ngx_http_request_t *r,ngx_str_t host_header, ngx_str_t *host, ngx_str_t *port);
 
 /*
  * Functions for variable setting.
@@ -795,7 +795,7 @@ static void determine_host_and_port(ngx_http_dlg_auth_loc_conf_t *conf,
     /*
      * Extract host and port from request.
      */
-    get_host_and_port(r->headers_in.host->value,&request_host,&request_port);
+    get_host_and_port(r,r->headers_in.host->value,&request_host,&request_port);
 
     /*
      * If host or port has not been explicitly set in configuration file or has been
@@ -821,7 +821,7 @@ static void determine_host_and_port(ngx_http_dlg_auth_loc_conf_t *conf,
  * Callers need to check the port len themselves and if it is 0
  * they are responsible for setting the default port.
  */
-static void get_host_and_port(ngx_str_t host_header, ngx_str_t *host, ngx_str_t *port) {
+static void get_host_and_port(ngx_http_request_t *r,ngx_str_t host_header, ngx_str_t *host, ngx_str_t *port) {
     u_char *p;
     unsigned int i;
     port->len = 0;
