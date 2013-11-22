@@ -119,7 +119,6 @@ static ngx_command_t ngx_dlg_auth_commands[] = {
 	        offsetof(ngx_http_dlg_auth_loc_conf_t, allowed_clock_skew),
 	        NULL },
 
-
     { ngx_string("dlg_auth_host"),
     	  NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LMT_CONF
     	                       |NGX_CONF_TAKE1,
@@ -236,6 +235,7 @@ static char * ngx_http_dlg_auth_iron_passwd(ngx_conf_t *cf, ngx_command_t *cmd, 
  * Initialization function to register handler to
  * nginx access phase.
  */
+
 static ngx_int_t ngx_http_dlg_auth_init(ngx_conf_t *cf) {
     ngx_http_handler_pt        *h;
     ngx_http_core_main_conf_t  *cmcf;
@@ -254,6 +254,7 @@ static ngx_int_t ngx_http_dlg_auth_init(ngx_conf_t *cf) {
  */
 static void *ngx_http_dlg_auth_create_loc_conf(ngx_conf_t *cf) {
     ngx_http_dlg_auth_loc_conf_t  *conf;
+
     if( (conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_dlg_auth_loc_conf_t))) == NULL) {
         return NULL;
     }
@@ -286,6 +287,7 @@ static void *ngx_http_dlg_auth_create_loc_conf(ngx_conf_t *cf) {
  * specifically.
  */
 static char * ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *vparent, void *vchild) {
+    ngx_str_t var;
     ngx_http_dlg_auth_loc_conf_t  *parent = (ngx_http_dlg_auth_loc_conf_t*)vparent;
     ngx_http_dlg_auth_loc_conf_t  *child = (ngx_http_dlg_auth_loc_conf_t*)vchild;
 
@@ -352,6 +354,7 @@ static char * ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *vparent, vo
        	    }
         }
     }
+
     return NGX_CONF_OK;
 }
 
@@ -384,6 +387,7 @@ static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r) {
      * store the data to be made accessible as variable values).
      */
     if( (ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_dlg_auth_ctx_t))) == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to allocate memory for dlg_auth module context");
     	return NGX_ERROR;
     }
     ngx_http_set_ctx(r, ctx, nginx_dlg_auth_module);
@@ -420,6 +424,7 @@ static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r) {
     if( (rc =  ngx_dlg_auth_authenticate(r,conf,ctx)) != NGX_OK) {
     	return rc;
     }
+
     ngx_dlg_auth_rename_authorization_header(r);
 
     return NGX_OK;
@@ -523,6 +528,11 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	 */
 	if( (ce =ciron_unseal(&ciron_ctx,hawkc_ctx.header_in.id.data, hawkc_ctx.header_in.id.len, &(conf->pwd_table),conf->iron_password.data, conf->iron_password.len,
 			encryption_options, integrity_options, encryption_buffer, output_buffer, &output_len)) != CIRON_OK) {
+			/* If password is not found, we consider that an authentication error, not a 405. */
+			if(ciron_get_error_code(&ciron_ctx) == CIRON_PASSWORD_ROTATION_ERROR) {
+			    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Password ID of ticket not found in configured iron passwords (%s)" , ciron_get_error(&ciron_ctx));
+		        return ngx_dlg_auth_send_simple_401(r,&(conf->realm));
+			}
 			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to unseal ticket: %s" , ciron_get_error(&ciron_ctx));
 			return NGX_HTTP_BAD_REQUEST;
 	}
@@ -560,7 +570,6 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Invalid signature in %V" ,&(r->headers_in.authorization->value) );
 		return ngx_dlg_auth_send_simple_401(r,&(conf->realm));
 	}
-
 	time(&now);
 	clock_skew = now - hawkc_ctx.header_in.ts;
 	if(store_clockskew(r,ctx,clock_skew) != NGX_OK) {
@@ -569,11 +578,12 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	}
 
 	/*
-	 * Check request timestamp, allowing for some skew.
+	 * If clock skew checking isn't disabled, check request timestamp, allowing for some skew.
 	 * If the client's clock differs to much from the server's clock, we send the client a 401
 	 * and our current time so it understands the offset and can send the request again.
+	 * Configuring allowed clock skew to be 0 disables checking.
 	 */
-	if(abs(clock_skew) > (time_t)(conf->allowed_clock_skew)) {
+	if( (conf->allowed_clock_skew != 0)  && (abs(clock_skew) > (time_t)(conf->allowed_clock_skew))) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Clock skew too large mine: %d, got %d ,skew is %d" , now , hawkc_ctx.header_in.ts,
 				clock_skew);
 		hawkc_www_authenticate_header_set_ts(&hawkc_ctx,now);
@@ -611,7 +621,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	/*
 	 * Now we check whether the ticket applies to the necessary scope.
 	 */
-	if(!ticket_has_scope(&ticket,host.data, host.len,conf->realm.data,conf->realm.len)) {
+	if(!ticket_has_scope(&ticket,conf->realm.data,conf->realm.len)) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Ticket does not represent grant for access to scope %V" ,&(conf->realm) );
 		return ngx_dlg_auth_send_simple_401(r,&(conf->realm));
 	}

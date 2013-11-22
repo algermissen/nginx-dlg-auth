@@ -274,15 +274,11 @@ TicketError do_algo(Builder builder) {
 	return OK;
 }
 
-int ticket_has_scope(Ticket ticket, unsigned char *host, size_t host_len, unsigned char *realm, size_t realm_len) {
+int ticket_has_scope(Ticket ticket, unsigned char *realm, size_t realm_len) {
 	size_t i;
-	size_t scope_len = host_len + 1 + realm_len; /* scope='host|realm' */
 	for(i=0;i<ticket->nscopes;i++) {
-		if(ticket->scopes[i].len == scope_len) {
-			unsigned char *s = ticket->scopes[i].data;
-			if( (memcmp(s,host,host_len) == 0)
-					&& (s[host_len] == '|')
-					&& (memcmp(s+host_len+1,realm,realm_len) == 0)) {
+		if(ticket->scopes[i].len == realm_len) {
+			if(memcmp(ticket->scopes[i].data,realm,realm_len) == 0) {
 				return 1;
 			}
 		}

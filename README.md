@@ -64,10 +64,20 @@ NGINX Module Configuration
 
     dlg_auth_allowed_clock_skew <allowed-skew-in-seconds>
 
+    dlg_auth_host <hostname>
+
+    dlg_auth_port <port>
+
+## dlg_auth
+
 If dlg_auth is missing or if realm is 'off', the module will not be enabled.
+
+## dlg_auth_iron_pwd
 
 You can use dlg_auth_iron_pwd to either set a single password, or to provide
 a set of passwordIds and password to enable password rotation.
+
+
 
 Examples
 

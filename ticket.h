@@ -66,12 +66,12 @@ char* ticket_strerror(TicketError e);
  */
 TicketError ticket_from_string(Ticket ticket, char *b, size_t len);
 
+
 /*
- * Returns 1 if the ticket contains a scope that matches the scope implied
- * by the provided host and realm.
- * A scope name has the form host '|' realm
+ * Returns 1 if the ticket contains a scope that matches the realm.
+ * This function considers scope and realm to match if they are byte-equal.
  */
-int ticket_has_scope(Ticket ticket, unsigned char *host, size_t host_len, unsigned char *realm, size_t realm_len);
+int ticket_has_scope(Ticket ticket, unsigned char *realm, size_t realm_len) ;
 
 #ifdef __cplusplus
 } // extern "C"
