@@ -18,11 +18,11 @@ before_script:
   - rm v${HAWKC_VERSION}.zip
   - cd ciron-${CIRON_VERSION}
   - ./configure && make all && make test
-  - make install
+  - sudo make install
   - cd ..
   - cd hawkc-${HAWKC_VERSION}
   - ./configure && make all && make test
-  - make install
+  - sudo make install
   - cd ..
   - find .
   - ls /usr/local/include
@@ -30,7 +30,7 @@ before_script:
   - cd nginx-${NGINX_VERSION}
   - ls
   - ./configure --add-module=../nginx-dlg-auth
-  - make && make install
+  - make && sudo make install
   - cat /usr/local/nginx/conf/nginx.conf
-
-
+  - sudo /usr/local/nginx/sbin/nginx
+  - curl http://localhost:8080/
