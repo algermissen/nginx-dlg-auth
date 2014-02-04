@@ -5,6 +5,6 @@ compiler:
 before_script:
   - NGINX_VERSION=1.4.3
   - cd ../
-  - curl -LO http://nginx.org/download/nginx-${VERSION}.tar.gz
-  - tar -xzf nginx-${VERSION}.tar.gz
+  - curl -LO http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz
+  - tar -xzf nginx-${NGINX_VERSION}.tar.gz
   - ls
