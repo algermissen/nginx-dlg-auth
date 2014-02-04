@@ -4,8 +4,8 @@ compiler:
 
 before_script:
   - NGINX_VERSION=1.5.8
-  - CIRON_VERSION=1.0
-  - HAWKC_VERSION=0.7
+  - CIRON_VERSION=1.2
+  - HAWKC_VERSION=0.8
   - cd ../
   - curl -LO http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz
   - tar -xzf nginx-${NGINX_VERSION}.tar.gz
