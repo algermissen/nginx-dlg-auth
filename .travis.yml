@@ -16,4 +16,17 @@ before_script:
   - curl -LO https://github.com/algermissen/hawkc/archive/v${HAWKC_VERSION}.zip
   - unzip v${HAWKC_VERSION}.zip
   - rm v${HAWKC_VERSION}.zip
+  - cd ciron-${CIRON_VERSION}
+  - ./configure && make all && make test
+  - make install
+  - cd ..
+  - cd hawkc-${HAWKC_VERSION}
+  - ./configure && make all && make test
+  - make install
+  - cd ..
   - find .
+  - ls /usr/local/include
+  - ls /usr/local/lib
+
+
+
