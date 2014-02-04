@@ -1,6 +1,7 @@
 #include <time.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <limits.h>
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
@@ -313,9 +314,6 @@ static char * ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *vparent, vo
     	child->pwd_table.nentries = parent->pwd_table.nentries;
     }
 
-
-
-
     /*
      * Inherit or set default allowed clock skew of 1s.
      */
@@ -429,6 +427,7 @@ static ngx_int_t ngx_dlg_auth_handler(ngx_http_request_t *r) {
     return NGX_OK;
 }
 
+
 /*
  * This is the heart of the module, where authentication and authorization
  * takes place.
@@ -500,7 +499,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	 * received an invalid ticket anyway.
 	 *
 	 * Using static buffers makes sense here, because we know the aprox. token length
-	 * in advance - we assume a fixed max. number of scopes. See definiton
+	 * in advance - we assume a fixed max. number of realms. See definiton
 	 * of ENCRYPTION_BUFFER_SIZE and OUTPUT_BUFFER_SIZE for how the size
 	 * is estimated.
 	 */
@@ -510,7 +509,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 				check_len);
 		return NGX_HTTP_BAD_REQUEST;
 	}
-    /* FIXME The last 0 is an issue with ciron: We won't know the password_id before unsealsing. but we need buffer size before.
+    /* FIXME The last 0 is an issue with ciron: We won't know the password_id before unsealing. but we need buffer size before.
      * Suggested FIX: ignore the passwordID on unsealing - hen this buffer length will always be passwordId.len too long.
      * That is not a problem! Hence we pass 0.
      * See https://github.com/algermissen/ciron/issues/15
@@ -612,16 +611,14 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	 */
 	if(ticket.exp < now) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Ticket has expired");
-		/* FIXME: probably set defined error code in auth header. This is a todo for the overall auth delegation (e.g. Oz) */
 		return ngx_dlg_auth_send_simple_401(r,&(conf->realm));
-
 	}
 
 	/*
-	 * Now we check whether the ticket applies to the necessary scope.
+	 * Now we check whether the ticket applies to the necessary realm.
 	 */
-	if(!ticket_has_scope(&ticket,conf->realm.data,conf->realm.len)) {
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Ticket does not represent grant for access to scope %V" ,&(conf->realm) );
+	if(!ticket_has_realm(&ticket,conf->realm.data,conf->realm.len)) {
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Ticket does not represent grant for access to realm %V" ,&(conf->realm) );
 		return ngx_dlg_auth_send_simple_401(r,&(conf->realm));
 	}
 
@@ -645,8 +642,9 @@ static void ngx_dlg_auth_rename_authorization_header(ngx_http_request_t *r) {
 	/*
 	 * Headers come as a list which we have to iterate over to find
 	 * the appropriate bucket.
-	 * FIXME: I think we can achieve the same by simply using the authorization pointer
-	 * and then setting it to NULL.
+	 * FIXME:
+	 * I think we can achieve the same by simply using the authorization pointer
+	 * to find the header and then setting the authorization pointer to NULL.
 	 */
 
 	nelts = r->headers_in.headers.part.nelts;
@@ -704,9 +702,9 @@ static ngx_int_t ngx_dlg_auth_send_simple_401(ngx_http_request_t *r, ngx_str_t *
 static ngx_int_t ngx_dlg_auth_send_401(ngx_http_request_t *r, HawkcContext hawkc_ctx) {
 		HawkcError e;
     	ngx_str_t challenge;
-    	size_t n,check_n;
+    	size_t required_length,check_required_length;
 
- 		if( (e = hawkc_calculate_www_authenticate_header_length(hawkc_ctx,&n)) != HAWKC_OK) {
+ 		if( (e = hawkc_calculate_www_authenticate_header_length(hawkc_ctx,&required_length)) != HAWKC_OK) {
     		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Error when calculating authentication header length, %s" ,
     				hawkc_get_error(hawkc_ctx));
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -717,31 +715,27 @@ static ngx_int_t ngx_dlg_auth_send_401(ngx_http_request_t *r, HawkcContext hawkc
     	 */
     	if( (r->headers_out.www_authenticate = ngx_list_push(&r->headers_out.headers)) == NULL) {
     		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to add new header, ngx_list_push returned NULL");
-
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
         r->headers_out.www_authenticate->hash = 1;
         ngx_str_set(&r->headers_out.www_authenticate->key, "WWW-Authenticate");
 
-        challenge.len = n;
+        challenge.len = required_length;
         if( (challenge.data = ngx_pnalloc(r->pool, challenge.len)) == NULL) {
        	  ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to allocate space for new header");
           return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
- 		if( (e = hawkc_create_www_authenticate_header(hawkc_ctx, challenge.data,&check_n)) != HAWKC_OK) {
+ 		if( (e = hawkc_create_www_authenticate_header(hawkc_ctx, challenge.data,&check_required_length)) != HAWKC_OK) {
    			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to create WWW-Authenticate header with timestamp, %s" ,
    					hawkc_get_error(hawkc_ctx));
  			return NGX_HTTP_INTERNAL_SERVER_ERROR;
  		}
- 		/*
-        p = ngx_cpymem(challenge.data, (unsigned char*)"Hawk realm=\"",12);
-        p = ngx_cpymem(p, realm->data, realm->len);
-        p = ngx_cpymem(p, (unsigned char*)"\"", 1);
-        */
- 		if(check_n != n) {
-       	  ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "check_n != n");
+
+ 		if(check_required_length != required_length) {
+       	  ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Number of bytes (%d) written to WWW-Authenticate header value differ from calculated required number of bytes (%d)",
+       	              check_required_length, required_length);
 			return NGX_HTTP_INTERNAL_SERVER_ERROR;
  		}
 
@@ -758,6 +752,7 @@ static void determine_host_and_port(ngx_http_dlg_auth_loc_conf_t *conf,
                             ngx_http_request_t *r,ngx_str_t *host, ngx_str_t *port) {
     ngx_str_t request_host;
     ngx_str_t request_port;
+
     /*
      * Initialize, so that we can safely check xxx->len for 0.
      */
@@ -778,7 +773,6 @@ static void determine_host_and_port(ngx_http_dlg_auth_loc_conf_t *conf,
         port->len = conf->port.len;
     }
 
-
     /*
      * If host and port have both been explicitly set in configuration, we are done at
      * this point.
@@ -788,7 +782,7 @@ static void determine_host_and_port(ngx_http_dlg_auth_loc_conf_t *conf,
     }
 
     /*
-     * Maybe add support for X-Forwarded-Host & freinds.
+     * Maybe add support for X-Forwarded-Host & friends.
      * See https://github.com/algermissen/nginx-dlg-auth/issues/12
      */
 
@@ -824,6 +818,7 @@ static void determine_host_and_port(ngx_http_dlg_auth_loc_conf_t *conf,
 static void get_host_and_port(ngx_http_request_t *r,ngx_str_t host_header, ngx_str_t *host, ngx_str_t *port) {
     u_char *p;
     unsigned int i;
+
     port->len = 0;
     p = host_header.data;
     /* Extract host */
@@ -921,5 +916,7 @@ static int is_digits_only(ngx_str_t *str) {
     }
     return 1;
 }
+
+
 
 

@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define MAX_SCOPES 10
+#define MAX_REALMS 10
 
 typedef struct Ticket {
 	HawkcString client;
@@ -17,8 +17,8 @@ typedef struct Ticket {
 	HawkcString owner;
 	HawkcString pwd;
 	int rw;
-	HawkcString scopes[MAX_SCOPES];
-	size_t nscopes;
+	HawkcString realms[MAX_REALMS];
+	size_t nrealms;
 	time_t exp;
 	HawkcAlgorithm hawkAlgorithm;
 } *Ticket;
@@ -35,7 +35,7 @@ typedef enum {
 	ERROR_UNEXPECTED_TOKEN_TYPE,
 	ERROR_UNEXPECTED_TOKEN_NAME,
 	ERROR_PARSE_TIME_VALUE,
-	ERROR_NSCOPES,
+	ERROR_NREALMS,
 	ERROR_UNKNOWN_HAWK_ALGORITHM,
 	ERROR
 } TicketError;
@@ -57,7 +57,7 @@ char* ticket_strerror(TicketError e);
  *   "user" : "77762",
  *   "owner" : 55514,
  *   "pwd":"w7*0T6C.0b4C#",
- *   "scopes" ["***REMOVED***|***REMOVED***"],
+ *   "scope" ["***REMOVED***"],
  *   "rw":false,
  *   "exp":1405688331,
  *   "hawkAlgorithm":"sha256"
@@ -68,10 +68,10 @@ TicketError ticket_from_string(Ticket ticket, char *b, size_t len);
 
 
 /*
- * Returns 1 if the ticket contains a scope that matches the realm.
- * This function considers scope and realm to match if they are byte-equal.
+ * Returns 1 if the ticket contains a realm that matches the realm.
+ * This function considers realms to match if they are byte-equal.
  */
-int ticket_has_scope(Ticket ticket, unsigned char *realm, size_t realm_len) ;
+int ticket_has_realm(Ticket ticket, unsigned char *realm, size_t realm_len) ;
 
 #ifdef __cplusplus
 } // extern "C"

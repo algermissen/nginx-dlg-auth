@@ -11,11 +11,11 @@
 
 /*
  * This max number of tokens must be large enough to handle usual tickets.
- * The number of tokens varies with the number of scopes. MAX_TOKENS has
- * been calculated like this:
+ * The number of tokens varies with the number of realms in the scope.
+ * MAX_TOKENS has been calculated like this:
  * 1 Token for the overall object
  * 16 Tokens for the 8 fields (2 tokens each)
- * MAX_SCOPE (see ticket.h) tokens for the scopes
+ * MAX_SCOPE (see ticket.h) tokens for the scope
  * => 27 tokens.
  *
  */
@@ -39,7 +39,7 @@ static TicketError do_algo(Builder builder);
 static TicketError do_string(Builder builder, HawkcString *s);
 static TicketError do_rw(Builder builder, int *v);
 static TicketError do_time(Builder builder, time_t *tp);
-static TicketError do_scopes(Builder builder);
+static TicketError do_scope(Builder builder);
 
 /*
  * digittoint was missing in some compile environments, so we supply
@@ -75,7 +75,7 @@ static char *error_strings[] = {
 		"Unexpected token type", /* ERROR_UNEXPECTED_TOKEN_TYPE */
 		"Unexpected token name", /* ERROR_UNEXPECTED_TOKEN_NAME */
 		"Unable to parse time value", /* ERROR_PARSE_TIME_VALUE */
-		"Too many scopes in ticket", /* ERROR_NSCOPES */
+		"Too many realms in ticket", /* ERROR_NREALMS */
 		"Unknown Hawk algorithm", /* ERROR_UNKNOWN_HAWK_ALGORITHM */
 		"Error" , /* ERROR */
 		NULL
@@ -143,8 +143,8 @@ TicketError ticket_from_string(Ticket ticket, char *json_string,size_t len) {
         		if( (e = do_string(&builder,&(ticket->owner))) != OK) {
         			return e;
         		}
-        	} else if(length == 6 && strncmp(s,"scopes",length) == 0) {
-        		if( (e = do_scopes(&builder)) != OK) {
+        	} else if(length == 5 && strncmp(s,"scope",length) == 0) {
+        		if( (e = do_scope(&builder)) != OK) {
         			return e;
         		}
         	} else if(length == 4 && strncmp(s,"user",length) == 0) {
@@ -238,7 +238,7 @@ TicketError do_rw(Builder builder, int *v) {
 	return OK;
 }
 
-TicketError do_scopes(Builder builder) {
+TicketError do_scope(Builder builder) {
 	jsmntok_t *t;
 	int i;
 	builder->i++;
@@ -249,13 +249,13 @@ TicketError do_scopes(Builder builder) {
 	if(t->type != JSMN_ARRAY) {
 		return ERROR_UNEXPECTED_TOKEN_TYPE;
 	}
-	if(t->size > MAX_SCOPES) {
-		return ERROR_NSCOPES;
+	if(t->size > MAX_REALMS) {
+		return ERROR_NREALMS;
 	}
 	for(i=0;i<t->size;i++) {
-		do_string(builder,&(builder->ticket->scopes[i]));
+		do_string(builder,&(builder->ticket->realms[i]));
 	}
-	builder->ticket->nscopes = t->size;
+	builder->ticket->nrealms = t->size;
 	return OK;
 }
 
@@ -274,11 +274,11 @@ TicketError do_algo(Builder builder) {
 	return OK;
 }
 
-int ticket_has_scope(Ticket ticket, unsigned char *realm, size_t realm_len) {
+int ticket_has_realm(Ticket ticket, unsigned char *realm, size_t realm_len) {
 	size_t i;
-	for(i=0;i<ticket->nscopes;i++) {
-		if(ticket->scopes[i].len == realm_len) {
-			if(memcmp(ticket->scopes[i].data,realm,realm_len) == 0) {
+	for(i=0;i<ticket->nrealms;i++) {
+		if(ticket->realms[i].len == realm_len) {
+			if(memcmp(ticket->realms[i].data,realm,realm_len) == 0) {
 				return 1;
 			}
 		}

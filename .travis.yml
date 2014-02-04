@@ -1,0 +1,10 @@
+language: c
+compiler:
+  - gcc
+
+before_script:
+  - NGINX_VERSION=1.4.3
+  - cd ../
+  - curl -LO http://nginx.org/download/nginx-${VERSION}.tar.gz
+  - tar -xzf nginx-${VERSION}.tar.gz
+  - ls
