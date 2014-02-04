@@ -9,7 +9,7 @@ before_script:
   - cd ../
   - curl -LO http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz
   - tar -xzf nginx-${NGINX_VERSION}.tar.gz
-  - rm nginx-${VERSION}.tar.gz
+  - rm nginx-${NGINX_VERSION}.tar.gz
   - curl -LO https://github.com/algermissen/ciron/archive/v${CIRON_VERSION}.zip
   - unzip v${CIRON_VERSION}.zip
   - rm v${CIRON_VERSION}.zip
@@ -27,6 +27,10 @@ before_script:
   - find .
   - ls /usr/local/include
   - ls /usr/local/lib
-
+  - cd nginx-${NGINX_VERSION}
+  - ls
+  - ./configure --add-module=../nginx-dlg-auth
+  - make && make install
+  - cat /usr/local/nginx/conf/nginx.conf
 
 
