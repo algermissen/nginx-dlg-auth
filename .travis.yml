@@ -32,5 +32,8 @@ before_script:
   - ./configure --add-module=../nginx-dlg-auth
   - make && sudo make install
   - cat /usr/local/nginx/conf/nginx.conf
+  - sudo cp ../nginx-dlg-auth/test/nginx.conf /usr/local/nginx/conf/nginx.conf
+  - cat /usr/local/nginx/conf/nginx.conf
   - sudo /usr/local/nginx/sbin/nginx
-  - curl http://localhost:8080/
+  - curl http://localhost:80/unprotected
+  - curl http://localhost:80/protected
