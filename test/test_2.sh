@@ -2,5 +2,5 @@
 
 echo $AUTH
 
-curl -H 'Authorization: '$AUTH http://localhost:80/protected
+curl -H 'Authorization: $AUTH' http://localhost:80/protected
 
