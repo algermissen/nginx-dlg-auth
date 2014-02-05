@@ -5,7 +5,7 @@ compiler:
 before_script:
   - NGINX_VERSION=1.5.8
   - CIRON_VERSION=1.2
-  - HAWKC_VERSION=0.8
+  - HAWKC_VERSION=0.8.1
   - cd ../
   - curl -LO http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz
   - tar -xzf nginx-${NGINX_VERSION}.tar.gz
@@ -37,7 +37,7 @@ before_script:
   - cat /usr/local/nginx/conf/nginx.conf
   - sudo /usr/local/nginx/sbin/nginx
   - cat nginx-dlg-auth/test/grant.json | iron -i 1 -p pwd1 > nginx-dlg-auth/test/token
-  - export AUTH=$(hawk -i `cat token` -p 'v8(9D1A>7n9J<' -H localhost -P /protected -a sha256)
+  - export AUTH=$(hawk -i `cat nginx-dlg-auth/test/token` -p 'v8(9D1A>7n9J<' -H localhost -P /protected -a sha256)
   - echo $AUTH
   - chmod a+x nginx-dlg-auth/test/run_tests.sh
   - chmod a+x nginx-dlg-auth/test/test*
