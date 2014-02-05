@@ -31,14 +31,16 @@ before_script:
   - ls
   - ./configure --add-module=../nginx-dlg-auth
   - make && sudo make install
+  - cd ..
   - cat /usr/local/nginx/conf/nginx.conf
   - sudo cp ../nginx-dlg-auth/test/nginx.conf /usr/local/nginx/conf/nginx.conf
   - cat /usr/local/nginx/conf/nginx.conf
   - sudo /usr/local/nginx/sbin/nginx
-  - curl http://localhost:80/unprotected
-  - curl http://localhost:80/protected
-  - chmod a+x ../nginx-dlg-auth/test/run_tests.sh
-  - chmod a+x ../nginx-dlg-auth/test/test*
+  - cat nginx-dlg-auth/test/grant.json | iron -i 1 -p pwd1 > nginx-dlg-auth/test/token
+  - export AUTH=$(hawk -i `cat token` -p 'v8(9D1A>7n9J<' -H localhost -P /protected -a sha256)
+  - echo $AUTH
+  - chmod a+x nginx-dlg-auth/test/run_tests.sh
+  - chmod a+x nginx-dlg-auth/test/test*
 
-script: cd ../nginx-dlg-auth/test; ./run_tests.sh
+script: cd nginx-dlg-auth/test; ./run_tests.sh
 

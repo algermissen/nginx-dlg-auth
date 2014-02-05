@@ -1,4 +1,6 @@
 #!/bin/bash
 
-curl http://localhost:80/protected
+echo $AUTH
+
+curl -H 'Authorization: '$AUTH http://localhost:80/protected
 
