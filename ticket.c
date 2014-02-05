@@ -147,6 +147,10 @@ TicketError ticket_from_string(Ticket ticket, char *json_string,size_t len) {
         		if( (e = do_scope(&builder)) != OK) {
         			return e;
         		}
+        	} else if(length == 6 && strncmp(s,"scopes",length) == 0) {
+        		if( (e = do_scope(&builder)) != OK) {
+        			return e;
+        		}
         	} else if(length == 4 && strncmp(s,"user",length) == 0) {
         		if( (e = do_string(&builder,&(ticket->user))) != OK) {
         			return e;
