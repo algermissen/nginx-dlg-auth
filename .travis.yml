@@ -33,7 +33,7 @@ before_script:
   - make && sudo make install
   - cd ..
   - cat /usr/local/nginx/conf/nginx.conf
-  - sudo cp ../nginx-dlg-auth/test/nginx.conf /usr/local/nginx/conf/nginx.conf
+  - sudo cp nginx-dlg-auth/test/nginx.conf /usr/local/nginx/conf/nginx.conf
   - cat /usr/local/nginx/conf/nginx.conf
   - sudo /usr/local/nginx/sbin/nginx
   - cat nginx-dlg-auth/test/grant.json | iron -i 1 -p pwd1 > nginx-dlg-auth/test/token
