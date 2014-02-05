@@ -1,4 +1,6 @@
 #!/bin/bash
 
-if [ `curl -s -X DELETE -H "$AUTH" http://localhost/protected -w "%{http_code}" -o /dev/null` -ne 401 ] ; then echo "Expected 401"; exit 1;  fi
+AH=$(hawk -i `cat token` -p 'v8(9D1A>7n9J<' -H localhost -P /protected -O 80 -M DELETE -a sha256 -m header)
+
+if [ `curl -s -X DELETE -H "$AH" http://localhost/protected -w "%{http_code}" -o /dev/null` -ne 401 ] ; then echo "Expected 401"; exit 1;  fi
 
