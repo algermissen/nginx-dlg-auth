@@ -37,3 +37,8 @@ before_script:
   - sudo /usr/local/nginx/sbin/nginx
   - curl http://localhost:80/unprotected
   - curl http://localhost:80/protected
+  - chmod a+x ../nginx-dlg-auth/test/run_tests.sh
+  - chmod a+x ../nginx-dlg-auth/test/test*
+
+script: cd ../nginx-dlg-auth/test; ./run_tests.sh
+
