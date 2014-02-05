@@ -44,3 +44,7 @@ before_script:
 
 script: cd nginx-dlg-auth/test; ./run_tests.sh
 
+
+after_script:
+  - cat /usr/local/nginx/logs/error.log
+
