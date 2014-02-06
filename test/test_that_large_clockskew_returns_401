@@ -4,5 +4,5 @@ AH=$(hawk -i `cat token` -p 'v8(9D1A>7n9J<' -H localhost -P /protected -O 80 -M 
 
 STATUS=`curl -s -H "$AH" http://localhost/protected -w "%{http_code}" -o /dev/null`;
 
-if [ $STATUS -ne 200 ] ; then echo "Expected 401 but got $STATUS"; exit 1;  fi
+if [ $STATUS -ne 401 ] ; then echo "Expected 401 but got $STATUS"; exit 1;  fi
 
