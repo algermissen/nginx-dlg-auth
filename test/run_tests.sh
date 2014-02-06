@@ -8,6 +8,5 @@ for t in $(ls test_*); do
     rc=1
     echo "   *** $t FAILED ***"
   fi
-  echo "RC: $rc"
 done
 exit $rc
