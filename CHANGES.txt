@@ -1,1 +1,4 @@
-1.0
+1.4
+ * Add Travis-CI NGINX-based tests
+
+1.3
