@@ -3,6 +3,10 @@
 rc=0
 for t in $(ls test_*); do 
   echo $t;
-  ./$t || (rc=$? && echo "   *** $t FAILED")
+  ./$t
+  if[ $? -ne 0 ] ; then
+    rc=$?
+    echo "   *** $t FAILED ***"
+  fi
 done
 exit $rc
