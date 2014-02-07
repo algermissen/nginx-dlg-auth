@@ -1,0 +1,29 @@
+#!/bin/bash
+
+TOKEN=`echo -n '{"client":"myTestClient","pwd":"v8(9D1A>7n9J<","scope":["test"],"rw":false,"exp":4405688331,"hawkAlgorithm":"sha256"}' | \
+	iron -i 1 -p $IRON_PASSWORD_1`
+
+echo "-------------"
+echo $TOKEN
+echo "-------------"
+
+AUTHORIZATION=$(hawk -i $TOKEN -p 'v8(9D1A>7n9J<' -H localhost -P /protected -O 80 -M GET -a sha256 -m header)
+
+echo $AUTHORIZATION
+
+STATUS=`curl -s -H "$AUTHORIZATION" http://localhost/protected -w "%{http_code}" -o /dev/null`;
+
+if [ $STATUS -ne 400 ] ; then
+	echo "... Expected 400 but got $STATUS";
+	exit 1;
+fi
+
+
+tail -1 /usr/local/nginx/logs/error.log | grep -q 'Invalid signature in Hawk'
+
+if [ $? -ne 0 ] ; then
+	echo "... Expected error message not present in error log"
+	tail -1 /usr/local/nginx/logs/error.log
+	exit 1;
+fi
+
