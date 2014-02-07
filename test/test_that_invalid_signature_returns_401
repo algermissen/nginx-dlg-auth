@@ -3,7 +3,7 @@
 echo -n '{"client":"myTestClient","pwd":"v8(9D1A>7n9J<","scope":["test"],"rw":false,"exp":4405688331,"hawkAlgorithm":"sha256"}' | \
 	iron -i 1 -p $IRON_PASSWORD_1 > tok
 
-AH=$(hawk -i `cat token` -p 'v8(9D1A>7n9J<' -H localhost -P /protectedxxx -O 80 -M GET -a sha256 -m header)
+AH=$(hawk -i `cat token` -p 'v8(9D1A>7n9J<' -H localhost -P /protected -O 80 -M GET -a sha256 -m header)
 
 STATUS=`curl -s -H "$AH" http://localhost/protected -w "%{http_code}" -o /dev/null`;
 
