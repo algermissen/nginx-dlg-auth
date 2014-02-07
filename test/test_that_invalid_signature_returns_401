@@ -15,8 +15,10 @@ if [ $STATUS -ne 401 ] ; then
 fi
 
 
-if [ tail -1 /usr/local/nginx/logs/error.log | grep 'Invalid signature in Hawk' -ne 0 ] ; then
-	echo "... Expected error message not present in error log'
+tail -1 /usr/local/nginx/logs/error.log | grep 'Invalid signature in Hawk'
+
+if [ $? -ne 0 ] ; then
+	echo "... Expected error message not present in error log"
 	tail -1 /usr/local/nginx/logs/error.log
 	exit 1;
 fi
