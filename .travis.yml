@@ -6,6 +6,7 @@ before_script:
   - NGINX_VERSION=1.5.8
   - CIRON_VERSION=1.2
   - HAWKC_VERSION=0.8.2
+  - export IRON_PASSWORD_1=982349872349234293429347923492837
   - cd ../
   - curl -LO http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz
   - tar -xzf nginx-${NGINX_VERSION}.tar.gz
@@ -32,8 +33,7 @@ before_script:
   - ./configure --add-module=../nginx-dlg-auth
   - make && sudo make install
   - cd ..
-  - cat /usr/local/nginx/conf/nginx.conf
-  - sudo cp nginx-dlg-auth/test/nginx.conf /usr/local/nginx/conf/nginx.conf
+  - sudo cat nginx-dlg-auth/test/nginx.conf | m4 -DIRON_PASSWORD_1=$IRON_PASSWORD_1 > /usr/local/nginx/conf/nginx.conf
   - cat /usr/local/nginx/conf/nginx.conf
   - sudo /usr/local/nginx/sbin/nginx
   - cat nginx-dlg-auth/test/grant.json | iron -i 1 -p pwd1 > nginx-dlg-auth/test/token
