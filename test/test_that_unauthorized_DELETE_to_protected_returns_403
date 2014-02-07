@@ -1,6 +1,25 @@
 #!/bin/bash
 
-AH=$(hawk -i `cat token` -p 'v8(9D1A>7n9J<' -H localhost -P /protected -O 80 -M DELETE -a sha256 -m header)
+TOKEN=`echo -n '{"client":"myTestClient","pwd":"v8(9D1A>7n9J<","scope":["test"],"rw":false,"exp":4405688331,"hawkAlgorithm":"sha256"}' | \
+        iron -i 1 -p $IRON_PASSWORD_1`
 
-if [ `curl -s -X DELETE -H "$AH" http://localhost/protected -w "%{http_code}" -o /dev/null` -ne 403 ] ; then echo "Expected 401"; exit 1;  fi
+AUTHORIZATION=$(hawk -i $TOKEN -p 'v8(9D1A>7n9J<' -H localhost -P /protected -O 80 -M DELETE -a sha256 -m header)
+
+echo $AUTHORIZATION
+
+STATUS=`curl -s -X DELETE -H "$AUTHORIZATION" http://localhost/protected -w "%{http_code}" -o /dev/null`;
+
+if [ $STATUS -ne 403 ] ; then
+        echo "... Expected 403 but got $STATUS";
+        exit 1;
+fi
+
+
+tail -1 /usr/local/nginx/logs/error.log | grep -q 'Unable to unseal ticket'
+
+if [ $? -ne 0 ] ; then
+        echo "... Expected error message not present in error log"
+        tail -1 /usr/local/nginx/logs/error.log
+        exit 1;
+fi
 

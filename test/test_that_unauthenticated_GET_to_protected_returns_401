@@ -1,4 +1,8 @@
 #!/bin/bash
 
-if [ `curl -s http://localhost/protected -w "%{http_code}" -o /dev/null` -ne 401 ] ; then echo "Expected 401"; exit 1;  fi
+STATUS=`curl -s http://localhost/protected -w "%{http_code}" -o /dev/null`
+if [ $STATUS -ne 401 ] ; then
+	echo "Expected 401 but got $STATUS";
+	exit 1;
+fi
 

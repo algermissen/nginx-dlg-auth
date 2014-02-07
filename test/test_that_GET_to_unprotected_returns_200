@@ -1,9 +1,9 @@
 #!/bin/bash
 
+STATUS=`curl -s http://localhost/unprotected -w "%{http_code}" -o /dev/null`
 
-
-if [ `curl -s http://localhost/unprotected -w "%{http_code}" -o /dev/null` -ne 200 ] ; then
-	echo "Expected 200";
+if [ $STATUS -ne 200 ] ; then
+	echo "Expected 200 but got $STATUS";
 	exit 1;
 fi
 

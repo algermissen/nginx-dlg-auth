@@ -22,7 +22,7 @@ fi
 tail -1 /usr/local/nginx/logs/error.log | grep -q 'Unable to unseal ticket'
 
 if [ $? -ne 0 ] ; then
-	echo "... Expected error message not present in error log"
+	echo "Expected error message not present in error log"
 	tail -1 /usr/local/nginx/logs/error.log
 	exit 1;
 fi
