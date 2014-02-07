@@ -3,9 +3,11 @@
 TOKEN=`echo -n '{"client":"myTestClient","pwd":"v8(9D1A>7n9J<","scope":["test"],"rw":false,"exp":4405688331,"hawkAlgorithm":"sha256"}' | \
 	iron -i 1 -p $IRON_PASSWORD_1`
 
+echo -n "-------------"
+echo -n $TOKEN
 echo "-------------"
-echo $TOKEN
-echo "-------------"
+
+TOKEN=xxxx$TOKEN
 
 AUTHORIZATION=$(hawk -i $TOKEN -p 'v8(9D1A>7n9J<' -H localhost -P /protected -O 80 -M GET -a sha256 -m header)
 
