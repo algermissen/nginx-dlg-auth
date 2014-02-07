@@ -33,9 +33,10 @@ before_script:
   - ./configure --add-module=../nginx-dlg-auth
   - make && sudo make install
   - cd ..
-  - sudo cat nginx-dlg-auth/test/nginx.conf | m4 -DIRON_PASSWORD_1=$IRON_PASSWORD_1 > /usr/local/nginx/conf/nginx.conf
+  - cat nginx-dlg-auth/test/nginx.conf | m4 -DIRON_PASSWORD_1=$IRON_PASSWORD_1 > tmp
+  - sudo cp tmp /usr/local/nginx/conf/nginx.conf
+  - rm tmp
   - cat /usr/local/nginx/conf/nginx.conf
-  - cat nginx-dlg-auth/test/grant.json | iron -i 1 -p pwd1 > nginx-dlg-auth/test/token
   - export AUTH=$(hawk -i `cat nginx-dlg-auth/test/token` -p 'v8(9D1A>7n9J<' -H localhost -P /protected -O 80 -M GET -a sha256 -m header)
   - echo $AUTH
   - chmod a+x nginx-dlg-auth/test/run_tests.sh
