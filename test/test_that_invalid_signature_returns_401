@@ -13,7 +13,7 @@ if [ $STATUS -ne 401 ] ; then
 fi
 
 
-tail -1 /usr/local/nginx/logs/error.log | grep -q 'Unable to unseal ticket'
+tail -1 /usr/local/nginx/logs/error.log | grep -q 'Invalid signature in Hawk'
 
 if [ $? -ne 0 ] ; then
         echo "... Expected error message not present in error log"
