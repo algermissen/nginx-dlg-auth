@@ -5,8 +5,6 @@ TOKEN=`echo -n '{"client":"myTestClient","pwd":"v8(9D1A>7n9J<","scope":["test"],
 
 AUTHORIZATION=$(hawk -i $TOKEN -p 'v8(9D1A>7n9J<' -H localhost -P /protected -O 80 -M DELETE -a sha256 -m header)
 
-echo $AUTHORIZATION
-
 STATUS=`curl -s -X DELETE -H "$AUTHORIZATION" http://localhost/protected -w "%{http_code}" -o /dev/null`;
 
 if [ $STATUS -ne 403 ] ; then
