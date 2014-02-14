@@ -505,7 +505,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	 */
 
 
-	if( (e = ciron_calculate_encryption_buffer_length(&ciron_ctx,hawkc_ctx.header_in.id.len,&check_len)) != CIRON_OK) {
+	if( (ce = ciron_calculate_encryption_buffer_length(&ciron_ctx,hawkc_ctx.header_in.id.len,&check_len)) != CIRON_OK) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Encryption buffer length calculation for Hawk ID length %zu would cause overflow. This might indicate an attack",
 				hawkc_ctx.header_in.id.len);
 		return NGX_HTTP_BAD_REQUEST;
@@ -516,7 +516,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 		return NGX_HTTP_BAD_REQUEST;
 	}
 
-	if( (e = ciron_calculate_unseal_buffer_length(&ciron_ctx,hawkc_ctx.header_in.id.len,&check_len) != CIRON_OK) {
+	if( (ce = ciron_calculate_unseal_buffer_length(&ciron_ctx,hawkc_ctx.header_in.id.len,&check_len) != CIRON_OK) {
 	    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unseal buffer length for Hawk ID length %zu would cause overflow. This might indicate an attack",
     				hawkc_ctx.header_in.id.len);
     		return NGX_HTTP_BAD_REQUEST;
