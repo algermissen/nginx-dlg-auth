@@ -489,7 +489,8 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 		if(he == HAWKC_PARSE_ERROR) {
 			return NGX_HTTP_BAD_REQUEST;
 		}
-		return NGX_HTTP_INTERNAL_SERVER_ERROR;
+		/* Fixes https://github.com/algermissen/nginx-dlg-auth/issues/18 */
+		return NGX_HTTP_BAD_REQUEST;
 	}
 
 	/*
@@ -608,7 +609,8 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	 */
 	if(IS_UNSAFE_METHOD(r->method)) {
 		if(ticket.rw == 0) {
-			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Ticket does not represent grant for unsafe methods");
+			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Ticket does not represent grant for unsafe methods; client=%V",
+			    &(ctx->client));
 			return NGX_HTTP_FORBIDDEN;
 		}
 	}
@@ -625,7 +627,9 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	 * Now we check whether the ticket applies to the necessary realm.
 	 */
 	if(!ticket_has_realm(&ticket,conf->realm.data,conf->realm.len)) {
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Ticket does not represent grant for access to realm %V" ,&(conf->realm) );
+	    /* Fixes https://github.com/algermissen/nginx-dlg-auth/issues/17 */
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Ticket does not represent grant for access to realm %V; client=%V" ,
+		    &(conf->realm),&(ctx->client) );
 		return ngx_dlg_auth_send_simple_401(r,&(conf->realm));
 	}
 
