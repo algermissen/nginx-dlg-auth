@@ -304,7 +304,7 @@ static char * ngx_http_dlg_auth_merge_loc_conf(ngx_conf_t *cf, void *vparent, vo
 
     /* Merge password table if any */
     if(child->pwd_table.nentries == 0) {
-    	int i;
+    	size_t i;
     	for(i=0;i<parent->pwd_table.nentries;i++) {
     		child->pwd_table.entries[i].password_id_len = parent->pwd_table.entries[i].password_id_len;
     		child->pwd_table.entries[i].password_id = parent->pwd_table.entries[i].password_id;
@@ -462,7 +462,7 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	time_t now;
 	time_t clock_skew;
 
-	ciron_context_init(&ctx,CIRON_DEFAULT_ENCRYPTION_OPTIONS,CIRON_DEFAULT_INTEGRITY_OPTIONS);
+	ciron_context_init(&ciron_ctx,CIRON_DEFAULT_ENCRYPTION_OPTIONS,CIRON_DEFAULT_INTEGRITY_OPTIONS);
 
     /*
      * Determine the host and port values to be used for signature validation.
@@ -505,37 +505,27 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	 */
 
 
-	if( (e = ciron_calculate_encryption_buffer_length(&ctx,hawkc_ctx.header_in.id.len,&check_len)) != CIRON_OK) {
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Encryption buffer length calculation for Hawk ID length %d would cause overflow. This might indicate an attack",
+	if( (e = ciron_calculate_encryption_buffer_length(&ciron_ctx,hawkc_ctx.header_in.id.len,&check_len)) != CIRON_OK) {
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Encryption buffer length calculation for Hawk ID length %zu would cause overflow. This might indicate an attack",
 				hawkc_ctx.header_in.id.len);
 		return NGX_HTTP_BAD_REQUEST;
 	}
-	if( check_len =  > sizeof(encryption_buffer)) {
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Required encryption buffer length %d too big. This might indicate an attack",
+	if( check_len > sizeof(encryption_buffer)) {
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Required encryption buffer length %zu too big. This might indicate an attack",
 				check_len);
 		return NGX_HTTP_BAD_REQUEST;
 	}
-	XXXXXX check above
 
-
-
-    /* FIXME The last 0 is an issue with ciron: We won't know the password_id before unsealing. but we need buffer size before.
-     * Suggested FIX: ignore the passwordID on unsealing - hen this buffer length will always be passwordId.len too long.
-     * That is not a problem! Hence we pass 0.
-     * See https://github.com/algermissen/ciron/issues/15
-     */
-	if( (e = ciron_calculate_unseal_buffer_length(&ctx,hawkc_ctx.header_in.id.len,&check_len) != CIRON_OK) {
-	    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unseal buffer length for Hawk ID length %d would cause overflow. This might indicate an attack",
+	if( (e = ciron_calculate_unseal_buffer_length(&ciron_ctx,hawkc_ctx.header_in.id.len,&check_len) != CIRON_OK) {
+	    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unseal buffer length for Hawk ID length %zu would cause overflow. This might indicate an attack",
     				hawkc_ctx.header_in.id.len);
     		return NGX_HTTP_BAD_REQUEST;
-
 	}
 	if( (check_len > sizeof(output_buffer)) {
-			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Required unseal buffer length %d too big. This might indicate an attack",
+			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Required unseal buffer length %zu too big. This might indicate an attack",
 					check_len);
 			return NGX_HTTP_BAD_REQUEST;
 	}
-	XXXXXX check above
 
 	/*
 	 * The sealed ticket is the Hawk id parameter. We unseal it, parse the ticket JSON
