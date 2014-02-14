@@ -451,8 +451,8 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 	CironError ce;
 	unsigned char encryption_buffer[ENCRYPTION_BUFFER_SIZE];
 	unsigned char output_buffer[OUTPUT_BUFFER_SIZE];
-	int check_len;
-	int output_len;
+	size_t check_len;
+	size_t output_len;
 
 	/*
 	 * Ticket processing and authorization checking.
