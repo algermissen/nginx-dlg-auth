@@ -24,20 +24,11 @@ and token expiration time.
 Status
 ======
 
-nginx-dlg-auth is in pre-release state from the point of view of Hawk and iron support.
-It could well be used without the specific token syntax by providing Hawk credentials
-in another way.
-
-There hasn't been any thorough testing
-so far nor is there any production experience. However, this NGINX module will
-be used in production shortly and then generate enough feedback to allow for
-aiming at a public version 1.0.
-
+The module has been used in a production environment for several months and version 1.5 fixes some
+minor security issues.
 
 Installation
 ============
-
-Note: I am working on an RPM-install of NGINX including the module.
 
 This NGINX module needs [ciron](https://github.com/algermissen/ciron)
 and [hawkc](https://github.com/algermissen/hawkc). Build them separately
@@ -54,6 +45,7 @@ Configure NGINX build like this:
 You may also want to add the library file to $LINK_DEPS to make
 sure nginx will correctly relink itself on make if library
 changes."
+
 
 NGINX Module Configuration
 ==========================

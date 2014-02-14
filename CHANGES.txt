@@ -1,3 +1,9 @@
+1.5
+ * Change dependency on latest ciron and hawkc libraries and associated API changes
+ * Fix 'Change 500 status to 400 on time value parsing error' #18
+ * Fix 'Log client etc. in log message on failed scope check' #17
+ * Fix 'Come up with a useful way to unit test and integration test this module' #15
+ * Fix 'Cast warning during build' #6
 1.4
  * Add Travis-CI NGINX-based tests
 
