@@ -547,6 +547,15 @@ static ngx_int_t ngx_dlg_auth_authenticate(ngx_http_request_t *r, ngx_http_dlg_a
 		return NGX_HTTP_BAD_REQUEST;
 	}
 
+	if( ticket.hawkAlgorithm == NULL ) {
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Ticket does not contain hawkAlgorithm member");
+		return NGX_HTTP_BAD_REQUEST;
+	}
+	if( ticket.pwd.len == 0 ) {
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Ticket does not contain password member");
+		return NGX_HTTP_BAD_REQUEST;
+	}
+
 	if(store_client(r,ctx,&ticket) != NGX_OK ) {
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Unable to store client variable, storage function returned error");
 		// We can still serve the request despite this error, so no error return
@@ -878,10 +887,12 @@ static void get_host_and_port(ngx_http_request_t *r,ngx_str_t host_header, ngx_s
  */
 ngx_int_t store_client(ngx_http_request_t *r, ngx_http_dlg_auth_ctx_t *ctx,Ticket ticket) {
 
-	 if( (ctx->client.data = ngx_pcalloc(r->pool, ticket->client.len)) == NULL) {
-		 return NGX_ERROR;
-	 }
-	 memcpy(ctx->client.data,ticket->client.data,ticket->client.len);
+    if( ticket->client.len > 0) {
+	    if( (ctx->client.data = ngx_pcalloc(r->pool, ticket->client.len)) == NULL) {
+		    return NGX_ERROR;
+	    }
+	    memcpy(ctx->client.data,ticket->client.data,ticket->client.len);
+     }
 	 ctx->client.len = ticket->client.len;
 	 return NGX_OK;
 }
