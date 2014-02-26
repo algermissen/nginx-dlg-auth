@@ -1,3 +1,6 @@
+1.6
+ * Fix segfault on missing hawkAlgorithm in token
+ * Add more token-structure tests
 1.5
  * Change dependency on latest ciron and hawkc libraries and associated API changes
  * Fix 'Change 500 status to 400 on time value parsing error' #18

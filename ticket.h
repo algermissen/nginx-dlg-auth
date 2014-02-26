@@ -57,7 +57,7 @@ char* ticket_strerror(TicketError e);
  *   "user" : "77762",
  *   "owner" : 55514,
  *   "pwd":"w7*0T6C.0b4C#",
- *   "scope" ["***REMOVED***"],
+ *   "scope" ["OTTO"],
  *   "rw":false,
  *   "exp":1405688331,
  *   "hawkAlgorithm":"sha256"
